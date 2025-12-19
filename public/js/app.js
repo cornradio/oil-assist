@@ -218,14 +218,18 @@ function renderRecords(records) {
         const priceDisplay = isInitialRecord ? '--' : `¥${record.price.toFixed(2)}`;
         const pricePerLiter = isInitialRecord ? '--' : `¥${(record.price / record.liters).toFixed(2)}`;
         let fuelConsumption = '-';
+        let mileageIncrease = '-';
         
         // 找到当前记录在按里程排序后的位置
         const currentIndex = mileageMap.get(record.id);
         if (currentIndex !== undefined && currentIndex > 0) {
             const prevRecord = sortedByMileage[currentIndex - 1];
             const distance = record.mileage - prevRecord.mileage;
-            if (distance > 0 && record.liters && record.liters > 0) {
-                fuelConsumption = (record.liters / distance * 100).toFixed(2);
+            if (distance > 0) {
+                mileageIncrease = distance.toFixed(1);
+                if (record.liters && record.liters > 0) {
+                    fuelConsumption = (record.liters / distance * 100).toFixed(2);
+                }
             }
         }
         
@@ -233,6 +237,7 @@ function renderRecords(records) {
             <tr>
                 <td>${formatDate(record.refuel_date)}</td>
                 <td>${record.mileage.toFixed(1)}</td>
+                <td>${mileageIncrease}</td>
                 <td>${litersDisplay}</td>
                 <td>${priceDisplay}</td>
                 <td>${pricePerLiter}</td>
@@ -256,6 +261,7 @@ function renderRecords(records) {
                 <tr>
                     <th>日期</th>
                     <th>里程数 (km)</th>
+                    <th>增加里程数 (km)</th>
                     <th>加油量 (L)</th>
                     <th>总价 (元)</th>
                     <th>单价 (元/L)</th>
