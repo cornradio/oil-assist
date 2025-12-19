@@ -331,9 +331,52 @@ header h1 {
     overflow: hidden;
 }
 
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 14px;
+}
+
+.chart-expand-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #666;
+    cursor: pointer;
+    padding: 5px 10px;
+    transition: color 0.2s;
+}
+
+.chart-expand-btn:hover {
+    color: #2c3e50;
+}
+
 .chart-wrapper canvas {
     max-width: 100% !important;
     height: auto !important;
+}
+
+.chart-modal-content {
+    width: 95%;
+    max-width: 1400px;
+    height: 90vh;
+    margin: 5vh auto;
+    padding: 20px;
+}
+
+.chart-modal-content #chartModalCanvas {
+    width: 100%;
+    height: calc(100% - 40px);
+    position: relative;
+}
+
+.chart-modal-content #chartModalCanvas canvas {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* 模态框样式 */

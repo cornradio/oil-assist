@@ -41,12 +41,24 @@
                 <div class="stats-info" id="statsInfo"></div>
                 <div class="charts-container">
                     <div class="chart-wrapper">
+                        <div class="chart-header">
+                            <span>油耗趋势</span>
+                            <button class="chart-expand-btn" onclick="expandChart('fuelConsumptionChart')" title="全屏查看">⛶</button>
+                        </div>
                         <canvas id="fuelConsumptionChart"></canvas>
                     </div>
                     <div class="chart-wrapper">
+                        <div class="chart-header">
+                            <span>加油费用</span>
+                            <button class="chart-expand-btn" onclick="expandChart('costChart')" title="全屏查看">⛶</button>
+                        </div>
                         <canvas id="costChart"></canvas>
                     </div>
                     <div class="chart-wrapper">
+                        <div class="chart-header">
+                            <span>油价趋势</span>
+                            <button class="chart-expand-btn" onclick="expandChart('priceChart')" title="全屏查看">⛶</button>
+                        </div>
                         <canvas id="priceChart"></canvas>
                     </div>
                 </div>
@@ -125,6 +137,14 @@
                 </div>
                 <button type="submit" class="btn btn-primary">保存</button>
             </form>
+        </div>
+    </div>
+
+    <!-- 全屏图表模态框 -->
+    <div id="chartModal" class="modal" style="display: none;">
+        <div class="modal-content chart-modal-content">
+            <span class="close" onclick="closeChartModal()">&times;</span>
+            <div id="chartModalCanvas"></div>
         </div>
     </div>
 

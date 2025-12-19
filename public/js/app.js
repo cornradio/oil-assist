@@ -25,7 +25,6 @@ async function loadVehicles() {
         renderVehicles();
     } catch (error) {
         console.error('加载车辆失败:', error);
-        alert('加载车辆失败，请刷新页面重试');
     }
 }
 
@@ -98,7 +97,6 @@ function selectVehicle(vehicleId) {
 // 刷新统计
 function refreshStats() {
     if (!currentVehicleId) {
-        alert('请先选择车辆');
         return;
     }
     
@@ -127,7 +125,6 @@ async function addVehicle(event) {
     const mileage = parseFloat(document.getElementById('vehicleMileage').value);
 
     if (!name || isNaN(mileage)) {
-        alert('请填写完整的车辆信息');
         return;
     }
 
@@ -142,13 +139,11 @@ async function addVehicle(event) {
         if (response.ok) {
             closeModal('addVehicleModal');
             loadVehicles();
-            alert('车辆添加成功！');
         } else {
-            alert('添加失败：' + result.error);
+            console.error('添加失败：', result.error);
         }
     } catch (error) {
         console.error('添加车辆失败:', error);
-        alert('添加车辆失败，请重试');
     }
 }
 
@@ -171,13 +166,11 @@ async function deleteVehicle(vehicleId) {
                 document.getElementById('statsSection').style.display = 'none';
             }
             loadVehicles();
-            alert('车辆删除成功！');
         } else {
-            alert('删除失败：' + result.error);
+            console.error('删除失败：', result.error);
         }
     } catch (error) {
         console.error('删除车辆失败:', error);
-        alert('删除车辆失败，请重试');
     }
 }
 
@@ -217,7 +210,13 @@ function renderRecords(records) {
     // records 已经是按日期从新到旧排序的（API返回）
     for (let i = 0; i < records.length; i++) {
         const record = records[i];
-        const pricePerLiter = (record.price / record.liters).toFixed(2);
+        // 检查是否为初始记录（liters或price为null/0/undefined）
+        const isInitialRecord = record.liters === null || record.liters === undefined || record.liters === 0 || 
+                                record.price === null || record.price === undefined || record.price === 0;
+        
+        const litersDisplay = isInitialRecord ? '--' : record.liters.toFixed(2);
+        const priceDisplay = isInitialRecord ? '--' : `¥${record.price.toFixed(2)}`;
+        const pricePerLiter = isInitialRecord ? '--' : `¥${(record.price / record.liters).toFixed(2)}`;
         let fuelConsumption = '-';
         
         // 找到当前记录在按里程排序后的位置
@@ -225,7 +224,7 @@ function renderRecords(records) {
         if (currentIndex !== undefined && currentIndex > 0) {
             const prevRecord = sortedByMileage[currentIndex - 1];
             const distance = record.mileage - prevRecord.mileage;
-            if (distance > 0) {
+            if (distance > 0 && record.liters && record.liters > 0) {
                 fuelConsumption = (record.liters / distance * 100).toFixed(2);
             }
         }
@@ -234,9 +233,9 @@ function renderRecords(records) {
             <tr>
                 <td>${formatDate(record.refuel_date)}</td>
                 <td>${record.mileage.toFixed(1)}</td>
-                <td>${record.liters.toFixed(2)}</td>
-                <td>¥${record.price.toFixed(2)}</td>
-                <td>¥${pricePerLiter}</td>
+                <td>${litersDisplay}</td>
+                <td>${priceDisplay}</td>
+                <td>${pricePerLiter}</td>
                 <td>${fuelConsumption}</td>
                 <td class="action-buttons">
                     <div class="record-menu" onclick="event.stopPropagation()">
@@ -274,7 +273,6 @@ function renderRecords(records) {
 // 显示添加记录模态框
 function showAddRecordModal() {
     if (!currentVehicleId) {
-        alert('请先选择车辆');
         return;
     }
     document.getElementById('addRecordModal').style.display = 'block';
@@ -322,7 +320,6 @@ async function addRefuelRecord(event) {
     const refuelDate = document.getElementById('recordDate').value;
 
     if (isNaN(liters) || isNaN(price) || isNaN(mileage) || !refuelDate) {
-        alert('请填写完整的加油信息');
         return;
     }
 
@@ -339,20 +336,17 @@ async function addRefuelRecord(event) {
             loadVehicleRecords();
             loadVehicleStats();
             loadVehicles(); // 更新车辆里程
-            alert('加油记录添加成功！');
         } else {
-            alert('添加失败：' + result.error);
+            console.error('添加失败：', result.error);
         }
     } catch (error) {
         console.error('添加记录失败:', error);
-        alert('添加记录失败，请重试');
     }
 }
 
 // 显示编辑记录模态框
 async function showEditRecordModal(recordId) {
     if (!currentVehicleId) {
-        alert('请先选择车辆');
         return;
     }
 
@@ -367,7 +361,6 @@ async function showEditRecordModal(recordId) {
         const record = records.find(r => r.id === recordId);
         
         if (!record) {
-            alert('找不到该记录');
             return;
         }
 
@@ -376,14 +369,13 @@ async function showEditRecordModal(recordId) {
         const date = new Date(record.refuel_date);
         date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
         document.getElementById('editRecordDate').value = date.toISOString().slice(0, 16);
-        document.getElementById('editRecordLiters').value = record.liters;
-        document.getElementById('editRecordPrice').value = record.price;
+        document.getElementById('editRecordLiters').value = record.liters || '';
+        document.getElementById('editRecordPrice').value = record.price || '';
         document.getElementById('editRecordMileage').value = record.mileage;
         
         document.getElementById('editRecordModal').style.display = 'block';
     } catch (error) {
         console.error('加载记录失败:', error);
-        alert('加载记录失败，请重试');
     }
 }
 
@@ -391,7 +383,6 @@ async function showEditRecordModal(recordId) {
 async function updateRefuelRecord(event) {
     event.preventDefault();
     if (!currentVehicleId) {
-        alert('请先选择车辆');
         return;
     }
 
@@ -402,7 +393,6 @@ async function updateRefuelRecord(event) {
     const refuelDate = document.getElementById('editRecordDate').value;
 
     if (isNaN(liters) || isNaN(price) || isNaN(mileage) || !refuelDate) {
-        alert('请填写完整的加油信息');
         return;
     }
 
@@ -419,13 +409,11 @@ async function updateRefuelRecord(event) {
             loadVehicleRecords();
             loadVehicleStats();
             loadVehicles(); // 更新车辆里程
-            alert('加油记录更新成功！');
         } else {
-            alert('更新失败：' + result.error);
+            console.error('更新失败：', result.error);
         }
     } catch (error) {
         console.error('更新记录失败:', error);
-        alert('更新记录失败，请重试');
     }
 }
 
@@ -450,13 +438,11 @@ async function deleteRecord(recordId) {
             loadVehicleRecords();
             loadVehicleStats();
             loadVehicles(); // 更新车辆里程
-            alert('加油记录删除成功！');
         } else {
-            alert('删除失败：' + result.error);
+            console.error('删除失败：', result.error);
         }
     } catch (error) {
         console.error('删除记录失败:', error);
-        alert('删除记录失败，请重试');
     }
 }
 
@@ -518,50 +504,153 @@ function renderStats(stats) {
 
 // 渲染图表
 function renderCharts(records, stats) {
-    if (records.length < 2) {
-        // 数据不足，显示提示
-        document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
-            wrapper.innerHTML = '<p style="text-align: center; color: #666; padding-top: 100px;">需要至少2条记录才能显示图表</p>';
+    console.log('渲染图表，记录数量:', records.length, records);
+    
+    if (!records || records.length < 1) {
+        // 数据不足，显示提示，但保留canvas元素
+        const wrappers = document.querySelectorAll('.chart-wrapper');
+        wrappers.forEach((wrapper, index) => {
+            const canvasId = ['fuelConsumptionChart', 'costChart', 'priceChart'][index];
+            if (!wrapper.querySelector('canvas')) {
+                wrapper.innerHTML = `<canvas id="${canvasId}"></canvas>`;
+            }
+            const canvas = wrapper.querySelector('canvas');
+            if (canvas) {
+                canvas.style.display = 'none';
+                if (!wrapper.querySelector('.no-data-message')) {
+                    const msg = document.createElement('p');
+                    msg.className = 'no-data-message';
+                    msg.style.cssText = 'text-align: center; color: #666; padding-top: 100px;';
+                    msg.textContent = '需要至少1条记录才能显示图表';
+                    wrapper.appendChild(msg);
+                }
+            }
         });
         return;
     }
+    
+    // 移除提示信息，显示canvas
+    document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
+        const msg = wrapper.querySelector('.no-data-message');
+        if (msg) {
+            msg.remove();
+        }
+        const canvas = wrapper.querySelector('canvas');
+        if (canvas) {
+            canvas.style.display = 'block';
+        }
+    });
 
     // 按日期排序
     records.sort((a, b) => new Date(a.refuel_date) - new Date(b.refuel_date));
 
     // 计算每次的油耗（L/100km）
+    // 横坐标使用所有记录的日期（包括初始记录）
+    const allLabels = records.map(r => formatDate(r.refuel_date, true));
     const fuelConsumptionData = [];
-    const labels = [];
     const costData = [];
     const priceData = [];
+    
+    // 初始化数组，长度与记录数相同
+    for (let i = 0; i < records.length; i++) {
+        fuelConsumptionData.push(null);
+        costData.push(null);
+        priceData.push(null);
+    }
 
-    for (let i = 1; i < records.length; i++) {
-        const distance = records[i].mileage - records[i-1].mileage;
-        if (distance > 0) {
-            const consumption = (records[i].liters / distance * 100).toFixed(2);
-            fuelConsumptionData.push(parseFloat(consumption));
-            labels.push(formatDate(records[i].refuel_date, true));
-            costData.push(records[i].price);
-            priceData.push((records[i].price / records[i].liters).toFixed(2));
+    // 填充所有有效记录的费用和油价（从第0条开始，跳过初始记录）
+    for (let i = 0; i < records.length; i++) {
+        const record = records[i];
+        // 如果有价格，显示费用
+        if (record.price !== null && record.price !== undefined && record.price > 0) {
+            costData[i] = record.price;
+        }
+        // 如果有加油量和价格，显示单价
+        if (record.liters !== null && record.liters !== undefined && record.liters > 0 && 
+            record.price !== null && record.price !== undefined && record.price > 0) {
+            priceData[i] = parseFloat((record.price / record.liters).toFixed(2));
         }
     }
 
+    // 计算油耗（需要前一条记录的里程，从第1条开始）
+    for (let i = 1; i < records.length; i++) {
+        const prevRecord = records[i-1];
+        const currentRecord = records[i];
+        const distance = currentRecord.mileage - prevRecord.mileage;
+        
+        // 只有当前记录有加油量且里程增加时，才计算油耗
+        if (distance > 0 && currentRecord.liters !== null && currentRecord.liters !== undefined && currentRecord.liters > 0) {
+            const consumption = (currentRecord.liters / distance * 100).toFixed(2);
+            fuelConsumptionData[i] = parseFloat(consumption);
+        }
+    }
+    
+    // 如果没有有效的数据点（比如里程没有增加），也显示提示
+    if (fuelConsumptionData.length === 0) {
+        const wrappers = document.querySelectorAll('.chart-wrapper');
+        wrappers.forEach((wrapper, index) => {
+            const canvasId = ['fuelConsumptionChart', 'costChart', 'priceChart'][index];
+            if (!wrapper.querySelector('canvas')) {
+                wrapper.innerHTML = `<canvas id="${canvasId}"></canvas>`;
+            }
+            const canvas = wrapper.querySelector('canvas');
+            if (canvas) {
+                canvas.style.display = 'none';
+                if (!wrapper.querySelector('.no-data-message')) {
+                    const msg = document.createElement('p');
+                    msg.className = 'no-data-message';
+                    msg.style.cssText = 'text-align: center; color: #666; padding-top: 100px;';
+                    msg.textContent = '需要至少2条记录且里程数递增才能显示图表';
+                    wrapper.appendChild(msg);
+                }
+            }
+        });
+        return;
+    }
+    
+    // 移除提示信息，显示canvas
+    document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
+        const msg = wrapper.querySelector('.no-data-message');
+        if (msg) {
+            msg.remove();
+        }
+        const canvas = wrapper.querySelector('canvas');
+        if (canvas) {
+            canvas.style.display = 'block';
+        }
+    });
+
+    // 确保canvas元素存在
+    let fuelCanvas = document.getElementById('fuelConsumptionChart');
+    if (!fuelCanvas) {
+        const wrapper = document.querySelectorAll('.chart-wrapper')[0];
+        if (wrapper) {
+            wrapper.innerHTML = '<canvas id="fuelConsumptionChart"></canvas>';
+            fuelCanvas = document.getElementById('fuelConsumptionChart');
+        }
+    }
+    if (!fuelCanvas) {
+        console.error('无法找到fuelConsumptionChart元素');
+        return;
+    }
+    
     // 油耗图表
-    const fuelCtx = document.getElementById('fuelConsumptionChart').getContext('2d');
+    const fuelCtx = fuelCanvas.getContext('2d');
     if (charts.fuelConsumption) {
         charts.fuelConsumption.destroy();
     }
     charts.fuelConsumption = new Chart(fuelCtx, {
         type: 'line',
         data: {
-            labels: labels,
+            labels: allLabels,
             datasets: [{
                 label: '油耗 (L/100km)',
                 data: fuelConsumptionData,
                 borderColor: '#2c3e50',
                 backgroundColor: 'rgba(44, 62, 80, 0.1)',
                 tension: 0.4,
-                fill: true
+                fill: true,
+                spanGaps: true
             }]
         },
         options: {
@@ -621,15 +710,23 @@ function renderCharts(records, stats) {
         }
     });
 
+    // 确保费用图表容器有canvas元素
+    const costChartWrapper = document.getElementById('costChart').parentElement;
+    let costCanvas = document.getElementById('costChart');
+    if (!costCanvas || costCanvas.tagName !== 'CANVAS') {
+        costChartWrapper.innerHTML = '<canvas id="costChart"></canvas>';
+        costCanvas = document.getElementById('costChart');
+    }
+    
     // 费用图表
-    const costCtx = document.getElementById('costChart').getContext('2d');
+    const costCtx = costCanvas.getContext('2d');
     if (charts.cost) {
         charts.cost.destroy();
     }
     charts.cost = new Chart(costCtx, {
         type: 'bar',
         data: {
-            labels: labels,
+            labels: allLabels,
             datasets: [{
                 label: '加油费用 (元)',
                 data: costData,
@@ -695,22 +792,37 @@ function renderCharts(records, stats) {
         }
     });
 
+    // 确保单价图表canvas元素存在
+    let priceCanvas = document.getElementById('priceChart');
+    if (!priceCanvas) {
+        const wrapper = document.querySelectorAll('.chart-wrapper')[2];
+        if (wrapper) {
+            wrapper.innerHTML = '<canvas id="priceChart"></canvas>';
+            priceCanvas = document.getElementById('priceChart');
+        }
+    }
+    if (!priceCanvas) {
+        console.error('无法找到priceChart元素');
+        return;
+    }
+    
     // 单价图表
-    const priceCtx = document.getElementById('priceChart').getContext('2d');
+    const priceCtx = priceCanvas.getContext('2d');
     if (charts.price) {
         charts.price.destroy();
     }
     charts.price = new Chart(priceCtx, {
         type: 'line',
         data: {
-            labels: labels,
+            labels: allLabels,
             datasets: [{
                 label: '单价 (元/L)',
                 data: priceData,
                 borderColor: '#7f8c8d',
                 backgroundColor: 'rgba(127, 140, 141, 0.1)',
                 tension: 0.4,
-                fill: true
+                fill: true,
+                spanGaps: true
             }]
         },
         options: {
@@ -802,4 +914,64 @@ function formatDate(dateString, short = false) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+// 展开图表到全屏
+function expandChart(chartId) {
+    const chartName = chartId === 'fuelConsumptionChart' ? 'fuelConsumption' : 
+                      chartId === 'costChart' ? 'cost' : 'price';
+    const chart = charts[chartName];
+    
+    if (!chart) {
+        return;
+    }
+    
+    const modal = document.getElementById('chartModal');
+    const canvasContainer = document.getElementById('chartModalCanvas');
+    
+    // 创建新的canvas用于全屏显示
+    canvasContainer.innerHTML = `<canvas id="fullscreen-${chartId}"></canvas>`;
+    const fullscreenCanvas = document.getElementById(`fullscreen-${chartId}`);
+    const ctx = fullscreenCanvas.getContext('2d');
+    
+    // 复制图表配置
+    const originalConfig = chart.config;
+    const config = {
+        type: originalConfig.type,
+        data: JSON.parse(JSON.stringify(originalConfig.data)),
+        options: {
+            ...originalConfig.options,
+            maintainAspectRatio: false,
+            responsive: true,
+            plugins: {
+                ...originalConfig.options.plugins,
+                title: {
+                    ...originalConfig.options.plugins.title,
+                    display: true
+                }
+            }
+        }
+    };
+    
+    // 创建新图表
+    const fullscreenChart = new Chart(ctx, config);
+    
+    // 显示模态框
+    modal.style.display = 'block';
+    
+    // 保存全屏图表引用以便关闭时销毁
+    window.fullscreenChart = fullscreenChart;
+}
+
+// 关闭全屏图表
+function closeChartModal() {
+    const modal = document.getElementById('chartModal');
+    modal.style.display = 'none';
+    
+    // 销毁全屏图表
+    if (window.fullscreenChart) {
+        window.fullscreenChart.destroy();
+        window.fullscreenChart = null;
+    }
+    
+    document.getElementById('chartModalCanvas').innerHTML = '';
+}
 

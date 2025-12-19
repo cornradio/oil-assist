@@ -31,8 +31,8 @@ function initDatabase() {
   db.run(`CREATE TABLE IF NOT EXISTS refuel_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     vehicle_id INTEGER NOT NULL,
-    liters REAL NOT NULL,
-    price REAL NOT NULL,
+    liters REAL,
+    price REAL,
     mileage REAL NOT NULL,
     refuel_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
@@ -54,7 +54,22 @@ function addVehicle(name, currentMileage, callback) {
     'INSERT INTO vehicles (name, current_mileage) VALUES (?, ?)',
     [name, currentMileage],
     function(err) {
-      callback(err, this.lastID);
+      if (err) {
+        callback(err);
+      } else {
+        const vehicleId = this.lastID;
+        // 自动创建一条初始记录（第0条记录）
+        db.run(
+          'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date) VALUES (?, ?, ?, ?, ?)',
+          [vehicleId, null, null, currentMileage, new Date().toISOString()],
+          function(recordErr) {
+            if (recordErr) {
+              console.error('创建初始记录错误:', recordErr.message);
+            }
+            callback(err, vehicleId);
+          }
+        );
+      }
     }
   );
 }
@@ -83,9 +98,12 @@ function deleteVehicle(vehicleId, callback) {
 // 添加加油记录
 function addRefuelRecord(vehicleId, liters, price, mileage, refuelDate, callback) {
   const date = refuelDate || new Date().toISOString();
+  // 如果liters或price为空，设置为null
+  const litersValue = (liters === null || liters === undefined || liters === '') ? null : liters;
+  const priceValue = (price === null || price === undefined || price === '') ? null : price;
   db.run(
     'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date) VALUES (?, ?, ?, ?, ?)',
-    [vehicleId, liters, price, mileage, date],
+    [vehicleId, litersValue, priceValue, mileage, date],
     function(err) {
       if (err) {
         callback(err);
