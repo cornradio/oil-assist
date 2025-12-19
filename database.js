@@ -325,6 +325,44 @@ function getExtraExpenseStats(vehicleId, callback) {
   );
 }
 
+// 清空车辆的加油记录
+function clearRefuelRecords(vehicleId, callback) {
+  // 先获取车辆初始里程
+  db.get('SELECT current_mileage FROM vehicles WHERE id = ?', [vehicleId], (err, vehicle) => {
+    if (err) {
+      callback(err);
+      return;
+    }
+    
+    const initialMileage = vehicle ? vehicle.current_mileage : 0;
+    
+    // 删除所有记录
+    db.run('DELETE FROM refuel_records WHERE vehicle_id = ?', [vehicleId], (err2) => {
+      if (err2) {
+        callback(err2);
+      } else {
+        // 重新创建初始记录
+        db.run(
+          'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date) VALUES (?, ?, ?, ?, ?)',
+          [vehicleId, null, null, initialMileage, new Date().toISOString()],
+          function(err3) {
+            if (err3) {
+              console.error('创建初始记录错误:', err3.message);
+            }
+            // 重置车辆里程
+            updateVehicleMileage(vehicleId, initialMileage, callback);
+          }
+        );
+      }
+    });
+  });
+}
+
+// 清空车辆的额外消费记录
+function clearExtraExpenses(vehicleId, callback) {
+  db.run('DELETE FROM extra_expenses WHERE vehicle_id = ?', [vehicleId], callback);
+}
+
 module.exports = {
   db,
   getAllVehicles,
@@ -341,7 +379,9 @@ module.exports = {
   addExtraExpense,
   updateExtraExpense,
   deleteExtraExpense,
-  getExtraExpenseStats
+  getExtraExpenseStats,
+  clearRefuelRecords,
+  clearExtraExpenses
 };
 
 

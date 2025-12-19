@@ -112,6 +112,7 @@ function refreshStats() {
     
     loadVehicleStats();
     loadVehicleRecords();
+    loadExtraExpenses();
 }
 
 // 显示添加车辆模态框
@@ -461,7 +462,12 @@ async function loadVehicleStats() {
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/stats`);
         const stats = await response.json();
-        renderStats(stats);
+        
+        // 加载额外消费统计
+        const expenseResponse = await fetch(`/api/vehicles/${currentVehicleId}/expense-stats`);
+        const expenseStats = await expenseResponse.json();
+        
+        renderStats(stats, expenseStats);
         
         // 加载图表数据
         const recordsResponse = await fetch(`/api/vehicles/${currentVehicleId}/records`);
@@ -473,11 +479,13 @@ async function loadVehicleStats() {
 }
 
 // 渲染统计信息
-function renderStats(stats) {
+function renderStats(stats, expenseStats) {
     const container = document.getElementById('statsInfo');
     const totalRefuels = stats.total_refuels || 0;
     const totalLiters = parseFloat(stats.total_liters || 0).toFixed(2);
-    const totalCost = parseFloat(stats.total_cost || 0).toFixed(2);
+    const fuelCost = parseFloat(stats.total_cost || 0);
+    const extraExpenseCost = parseFloat(expenseStats?.total_amount || 0);
+    const totalCost = (fuelCost + extraExpenseCost).toFixed(2);
     const avgPrice = parseFloat(stats.avg_price_per_liter || 0).toFixed(2);
     const totalDistance = parseFloat(stats.total_distance || 0).toFixed(1);
     const avgConsumption = parseFloat(stats.avg_fuel_consumption || 0);
@@ -490,6 +498,14 @@ function renderStats(stats) {
         <div class="stat-item">
             <div class="label">总加油量</div>
             <div class="value">${totalLiters} L</div>
+        </div>
+        <div class="stat-item">
+            <div class="label">加油费用</div>
+            <div class="value">¥${fuelCost.toFixed(2)}</div>
+        </div>
+        <div class="stat-item">
+            <div class="label">额外消费</div>
+            <div class="value">¥${extraExpenseCost.toFixed(2)}</div>
         </div>
         <div class="stat-item">
             <div class="label">总费用</div>
@@ -1545,4 +1561,75 @@ function parseCSVLine(line) {
     values.push(current);
     
     return values;
+}
+
+// 清空加油记录
+async function clearRefuelRecords() {
+    if (!currentVehicleId) {
+        return;
+    }
+
+    // 强提示：需要输入确认文字
+    const confirmText = prompt('⚠️ 警告：此操作将删除该车辆的所有加油记录（包括初始记录）！\n\n请输入"清空"以确认：');
+    
+    if (confirmText !== '清空') {
+        return;
+    }
+
+    // 二次确认
+    if (!confirm('⚠️ 最后确认：确定要清空所有加油记录吗？此操作不可恢复！')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/records`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            loadVehicleRecords();
+            loadVehicleStats();
+            loadVehicles();
+        } else {
+            console.error('清空失败：', result.error);
+        }
+    } catch (error) {
+        console.error('清空记录失败:', error);
+    }
+}
+
+// 清空额外消费记录
+async function clearExpenses() {
+    if (!currentVehicleId) {
+        return;
+    }
+
+    // 强提示：需要输入确认文字
+    const confirmText = prompt('⚠️ 警告：此操作将删除该车辆的所有额外消费记录！\n\n请输入"清空"以确认：');
+    
+    if (confirmText !== '清空') {
+        return;
+    }
+
+    // 二次确认
+    if (!confirm('⚠️ 最后确认：确定要清空所有额外消费记录吗？此操作不可恢复！')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            loadExtraExpenses();
+            loadVehicleStats();
+        } else {
+            console.error('清空失败：', result.error);
+        }
+    } catch (error) {
+        console.error('清空记录失败:', error);
+    }
 }

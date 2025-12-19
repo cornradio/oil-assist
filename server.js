@@ -121,6 +121,30 @@ app.delete('/api/records/:id', (req, res) => {
   });
 });
 
+// 清空车辆的加油记录
+app.delete('/api/vehicles/:id/records', (req, res) => {
+  const vehicleId = parseInt(req.params.id);
+  db.clearRefuelRecords(vehicleId, (err) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json({ message: '加油记录清空成功' });
+    }
+  });
+});
+
+// 清空车辆的额外消费记录
+app.delete('/api/vehicles/:id/expenses', (req, res) => {
+  const vehicleId = parseInt(req.params.id);
+  db.clearExtraExpenses(vehicleId, (err) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json({ message: '额外消费记录清空成功' });
+    }
+  });
+});
+
 // 获取车辆统计信息
 app.get('/api/vehicles/:id/stats', (req, res) => {
   const vehicleId = parseInt(req.params.id);

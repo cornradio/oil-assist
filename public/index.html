@@ -25,11 +25,13 @@
         <!-- 加油记录区域 -->
         <section class="section" id="refuelSection" style="display: none;">
             <div class="section-header">
-                <h2>加油记录</h2>
-                <div class="action-buttons-group">
-                    <button class="btn btn-primary btn-sm" onclick="exportRefuelRecords()">导出</button>
-                    <button class="btn btn-primary btn-sm" onclick="showImportModal('refuel')">导入</button>
-                </div>
+                <h2>加油记录
+                    <span class="header-actions">
+                        <button class="btn-icon" onclick="exportRefuelRecords()" title="导出">导出</button>
+                        <button class="btn-icon" onclick="showImportModal('refuel')" title="导入">导入</button>
+                        <button class="btn-icon btn-icon-danger" onclick="clearRefuelRecords()" title="清空">清空</button>
+                    </span>
+                </h2>
             </div>
             <div class="card">
                 <button class="btn btn-primary" onclick="showAddRecordModal()">+ 添加加油记录</button>
@@ -40,11 +42,13 @@
         <!-- 额外消费区域 -->
         <section class="section" id="expenseSection" style="display: none;">
             <div class="section-header">
-                <h2>额外消费</h2>
-                <div class="action-buttons-group">
-                    <button class="btn btn-primary btn-sm" onclick="exportExpenses()">导出</button>
-                    <button class="btn btn-primary btn-sm" onclick="showImportModal('expense')">导入</button>
-                </div>
+                <h2>额外消费
+                    <span class="header-actions">
+                        <button class="btn-icon" onclick="exportExpenses()" title="导出">导出</button>
+                        <button class="btn-icon" onclick="showImportModal('expense')" title="导入">导入</button>
+                        <button class="btn-icon btn-icon-danger" onclick="clearExpenses()" title="清空">清空</button>
+                    </span>
+                </h2>
             </div>
             <div class="card">
                 <button class="btn btn-primary" onclick="showAddExpenseModal()">+ 添加消费记录</button>
@@ -55,8 +59,11 @@
         <!-- 统计图表区域 -->
         <section class="section" id="statsSection" style="display: none;">
             <div class="section-header">
-                <h2>统计图表</h2>
-                <button class="btn btn-primary btn-sm" onclick="refreshStats()">刷新</button>
+                <h2>统计图表
+                    <span class="header-actions">
+                        <button class="btn-icon" onclick="refreshStats()" title="刷新">刷新</button>
+                    </span>
+                </h2>
             </div>
             <div class="card">
                 <div class="stats-info" id="statsInfo"></div>

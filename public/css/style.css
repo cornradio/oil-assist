@@ -42,19 +42,53 @@ header h1 {
 }
 
 .section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 15px;
 }
 
 .section-header h2 {
     margin-bottom: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
 }
 
-.action-buttons-group {
-    display: flex;
-    gap: 10px;
+.header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 10px;
+}
+
+.btn-icon {
+    background: #f0f0f0;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #666;
+    line-height: 1;
+}
+
+.btn-icon:hover {
+    background: #e5e5e5;
+    border-color: #d0d0d0;
+    color: #333;
+}
+
+.btn-icon:active {
+    background: #ddd;
+}
+
+.btn-icon-danger {
+    color: #e74c3c;
+}
+
+.btn-icon-danger:hover {
+    background: #ffe5e5;
+    border-color: #e74c3c;
+    color: #c0392b;
 }
 
 .btn-sm {
@@ -316,6 +350,50 @@ header h1 {
     font-size: 24px;
     font-weight: bold;
     color: #2c3e50;
+}
+
+.stat-item-full {
+    grid-column: 1 / -1;
+    border-top: 2px solid #e0e0e0;
+    padding-top: 15px;
+    margin-top: 10px;
+}
+
+.stat-money-row {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.stat-money-item {
+    text-align: center;
+    flex: 1;
+    min-width: 120px;
+}
+
+.stat-money-item .label {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.stat-money-item .value {
+    font-size: 20px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.stat-money-total {
+    border-left: 2px solid #e0e0e0;
+    border-right: 2px solid #e0e0e0;
+    padding: 0 20px;
+}
+
+.stat-money-total .value {
+    font-size: 24px;
+    color: #e74c3c;
 }
 
 .charts-container {
