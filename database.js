@@ -41,6 +41,20 @@ function initDatabase() {
       console.error('创建加油记录表错误:', err.message);
     }
   });
+
+  // 额外消费表
+  db.run(`CREATE TABLE IF NOT EXISTS extra_expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vehicle_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    amount REAL NOT NULL,
+    expense_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+  )`, (err) => {
+    if (err) {
+      console.error('创建额外消费表错误:', err.message);
+    }
+  });
 }
 
 // 获取所有车辆
@@ -257,6 +271,60 @@ function getVehicleStats(vehicleId, callback) {
   );
 }
 
+// 获取车辆的额外消费记录
+function getExtraExpenses(vehicleId, callback) {
+  db.all(
+    'SELECT * FROM extra_expenses WHERE vehicle_id = ? ORDER BY expense_date DESC',
+    [vehicleId],
+    callback
+  );
+}
+
+// 添加额外消费记录
+function addExtraExpense(vehicleId, title, amount, expenseDate, callback) {
+  const date = expenseDate || new Date().toISOString();
+  db.run(
+    'INSERT INTO extra_expenses (vehicle_id, title, amount, expense_date) VALUES (?, ?, ?, ?)',
+    [vehicleId, title, amount, date],
+    function(err) {
+      callback(err, this.lastID);
+    }
+  );
+}
+
+// 更新额外消费记录
+function updateExtraExpense(expenseId, title, amount, expenseDate, callback) {
+  db.run(
+    'UPDATE extra_expenses SET title = ?, amount = ?, expense_date = ? WHERE id = ?',
+    [title, amount, expenseDate, expenseId],
+    callback
+  );
+}
+
+// 删除额外消费记录
+function deleteExtraExpense(expenseId, callback) {
+  db.run('DELETE FROM extra_expenses WHERE id = ?', [expenseId], callback);
+}
+
+// 获取车辆额外消费统计
+function getExtraExpenseStats(vehicleId, callback) {
+  db.all(
+    `SELECT 
+      COUNT(*) as total_expenses,
+      SUM(amount) as total_amount
+     FROM extra_expenses 
+     WHERE vehicle_id = ?`,
+    [vehicleId],
+    (err, rows) => {
+      if (err) {
+        callback(err);
+      } else {
+        callback(null, rows[0] || { total_expenses: 0, total_amount: 0 });
+      }
+    }
+  );
+}
+
 module.exports = {
   db,
   getAllVehicles,
@@ -268,7 +336,12 @@ module.exports = {
   deleteRefuelRecord,
   getRefuelRecords,
   getAllRefuelRecords,
-  getVehicleStats
+  getVehicleStats,
+  getExtraExpenses,
+  addExtraExpense,
+  updateExtraExpense,
+  deleteExtraExpense,
+  getExtraExpenseStats
 };
 
 

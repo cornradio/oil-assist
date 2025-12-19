@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 点击页面其他地方时关闭菜单
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.vehicle-menu') && !e.target.closest('.record-menu')) {
+        if (!e.target.closest('.vehicle-menu') && !e.target.closest('.record-menu') && !e.target.closest('.expense-menu')) {
             document.querySelectorAll('.menu-dropdown').forEach(menu => {
                 menu.style.display = 'none';
             });
@@ -75,6 +75,7 @@ function selectVehicle(vehicleId) {
     currentVehicleId = vehicleId;
     renderVehicles();
     document.getElementById('refuelSection').style.display = 'block';
+    document.getElementById('expenseSection').style.display = 'block';
     document.getElementById('statsSection').style.display = 'block';
     
     // 销毁所有现有图表
@@ -86,6 +87,7 @@ function selectVehicle(vehicleId) {
     charts = {};
     
     loadVehicleRecords();
+    loadExtraExpenses();
     loadVehicleStats();
     
     // 关闭所有菜单
@@ -981,3 +983,566 @@ function closeChartModal() {
     document.getElementById('chartModalCanvas').innerHTML = '';
 }
 
+// 加载额外消费记录
+async function loadExtraExpenses() {
+    if (!currentVehicleId) return;
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`);
+        const expenses = await response.json();
+        renderExpenses(expenses);
+    } catch (error) {
+        console.error('加载消费记录失败:', error);
+    }
+}
+
+// 渲染额外消费列表
+function renderExpenses(expenses) {
+    const container = document.getElementById('expensesList');
+    if (expenses.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">暂无消费记录</p>';
+        return;
+    }
+
+    let tableRows = '';
+    for (let i = 0; i < expenses.length; i++) {
+        const expense = expenses[i];
+        tableRows += `
+            <tr>
+                <td>${formatDate(expense.expense_date)}</td>
+                <td>${escapeHtml(expense.title)}</td>
+                <td>¥${expense.amount.toFixed(2)}</td>
+                <td class="action-buttons">
+                    <div class="record-menu" onclick="event.stopPropagation()">
+                        <button class="menu-btn" onclick="toggleExpenseMenu(${expense.id})">⋯</button>
+                        <div class="menu-dropdown" id="expense-menu-${expense.id}" style="display: none;">
+                            <button class="menu-item" onclick="showEditExpenseModal(${expense.id})">编辑</button>
+                            <button class="menu-item menu-item-danger" onclick="deleteExpense(${expense.id})">删除</button>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    container.innerHTML = `
+        <table class="records-table">
+            <thead>
+                <tr>
+                    <th>日期</th>
+                    <th>消费标题</th>
+                    <th>金额 (元)</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+    `;
+}
+
+// 切换消费记录菜单
+function toggleExpenseMenu(expenseId) {
+    // 关闭所有其他菜单
+    document.querySelectorAll('.menu-dropdown').forEach(menu => {
+        if (menu.id !== `expense-menu-${expenseId}`) {
+            menu.style.display = 'none';
+        }
+    });
+    
+    // 切换当前菜单
+    const menu = document.getElementById(`expense-menu-${expenseId}`);
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+// 显示添加消费记录模态框
+function showAddExpenseModal() {
+    if (!currentVehicleId) {
+        return;
+    }
+    document.getElementById('addExpenseModal').style.display = 'block';
+    document.getElementById('addExpenseForm').reset();
+    
+    // 设置默认日期为今天
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('expenseDate').value = today;
+}
+
+// 添加额外消费记录
+async function addExtraExpense(event) {
+    event.preventDefault();
+    if (!currentVehicleId) {
+        return;
+    }
+
+    const title = document.getElementById('expenseTitle').value.trim();
+    const amount = parseFloat(document.getElementById('expenseAmount').value);
+    const expenseDate = document.getElementById('expenseDate').value;
+
+    if (!title || isNaN(amount) || !expenseDate) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, amount, expense_date: expenseDate })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            closeModal('addExpenseModal');
+            loadExtraExpenses();
+        } else {
+            console.error('添加失败：', result.error);
+        }
+    } catch (error) {
+        console.error('添加消费记录失败:', error);
+    }
+}
+
+// 显示编辑消费记录模态框
+async function showEditExpenseModal(expenseId) {
+    if (!currentVehicleId) {
+        return;
+    }
+
+    // 关闭菜单
+    document.querySelectorAll('.menu-dropdown').forEach(menu => {
+        menu.style.display = 'none';
+    });
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`);
+        const expenses = await response.json();
+        const expense = expenses.find(e => e.id === expenseId);
+        
+        if (!expense) {
+            return;
+        }
+
+        // 填充表单
+        document.getElementById('editExpenseId').value = expense.id;
+        const date = new Date(expense.expense_date);
+        document.getElementById('editExpenseDate').value = date.toISOString().split('T')[0];
+        document.getElementById('editExpenseTitle').value = expense.title;
+        document.getElementById('editExpenseAmount').value = expense.amount;
+        
+        document.getElementById('editExpenseModal').style.display = 'block';
+    } catch (error) {
+        console.error('加载消费记录失败:', error);
+    }
+}
+
+// 更新额外消费记录
+async function updateExtraExpense(event) {
+    event.preventDefault();
+    if (!currentVehicleId) {
+        return;
+    }
+
+    const expenseId = parseInt(document.getElementById('editExpenseId').value);
+    const title = document.getElementById('editExpenseTitle').value.trim();
+    const amount = parseFloat(document.getElementById('editExpenseAmount').value);
+    const expenseDate = document.getElementById('editExpenseDate').value;
+
+    if (!title || isNaN(amount) || !expenseDate) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/expenses/${expenseId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, amount, expense_date: expenseDate })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            closeModal('editExpenseModal');
+            loadExtraExpenses();
+        } else {
+            console.error('更新失败：', result.error);
+        }
+    } catch (error) {
+        console.error('更新消费记录失败:', error);
+    }
+}
+
+// 删除额外消费记录
+async function deleteExpense(expenseId) {
+    // 关闭菜单
+    document.querySelectorAll('.menu-dropdown').forEach(menu => {
+        menu.style.display = 'none';
+    });
+
+    if (!confirm('确定要删除这条消费记录吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/expenses/${expenseId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            loadExtraExpenses();
+        } else {
+            console.error('删除失败：', result.error);
+        }
+    } catch (error) {
+        console.error('删除消费记录失败:', error);
+    }
+}
+
+// 全局变量：当前导入类型
+let currentImportType = null;
+
+// 导出加油记录
+async function exportRefuelRecords() {
+    if (!currentVehicleId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/records`);
+        const records = await response.json();
+        
+        if (records.length === 0) {
+            return;
+        }
+
+        // 按日期排序
+        records.sort((a, b) => new Date(a.refuel_date) - new Date(b.refuel_date));
+
+        // 生成CSV内容
+        const headers = ['日期', '里程数(km)', '增加里程数(km)', '加油量(L)', '总价(元)', '单价(元/L)', '油耗(L/100km)'];
+        const rows = [headers.join(',')];
+
+        // 按里程数排序用于计算
+        const sortedByMileage = [...records].sort((a, b) => a.mileage - b.mileage);
+        const mileageMap = new Map();
+        sortedByMileage.forEach((r, i) => {
+            mileageMap.set(r.id, i);
+        });
+
+        for (let i = 0; i < records.length; i++) {
+            const record = records[i];
+            const isInitialRecord = record.liters === null || record.liters === undefined || record.liters === 0 || 
+                                    record.price === null || record.price === undefined || record.price === 0;
+            
+            const litersDisplay = isInitialRecord ? '--' : record.liters.toFixed(2);
+            const priceDisplay = isInitialRecord ? '--' : record.price.toFixed(2);
+            const pricePerLiter = isInitialRecord ? '--' : (record.price / record.liters).toFixed(2);
+            
+            let mileageIncrease = '-';
+            let fuelConsumption = '-';
+            
+            const currentIndex = mileageMap.get(record.id);
+            if (currentIndex !== undefined && currentIndex > 0) {
+                const prevRecord = sortedByMileage[currentIndex - 1];
+                const distance = record.mileage - prevRecord.mileage;
+                if (distance > 0) {
+                    mileageIncrease = distance.toFixed(1);
+                    if (record.liters && record.liters > 0) {
+                        fuelConsumption = (record.liters / distance * 100).toFixed(2);
+                    }
+                }
+            }
+
+            const row = [
+                formatDate(record.refuel_date),
+                record.mileage.toFixed(1),
+                mileageIncrease,
+                litersDisplay,
+                priceDisplay,
+                pricePerLiter,
+                fuelConsumption
+            ];
+            rows.push(row.join(','));
+        }
+
+        const csvContent = rows.join('\n');
+        exportToCSV(csvContent, `加油记录_${new Date().toISOString().split('T')[0]}.csv`);
+    } catch (error) {
+        console.error('导出失败:', error);
+    }
+}
+
+// 导出额外消费记录
+async function exportExpenses() {
+    if (!currentVehicleId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`);
+        const expenses = await response.json();
+        
+        if (expenses.length === 0) {
+            return;
+        }
+
+        // 按日期排序
+        expenses.sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date));
+
+        // 生成CSV内容
+        const headers = ['日期', '消费标题', '金额(元)'];
+        const rows = [headers.join(',')];
+
+        for (let i = 0; i < expenses.length; i++) {
+            const expense = expenses[i];
+            const row = [
+                formatDate(expense.expense_date),
+                `"${expense.title.replace(/"/g, '""')}"`,
+                expense.amount.toFixed(2)
+            ];
+            rows.push(row.join(','));
+        }
+
+        const csvContent = rows.join('\n');
+        exportToCSV(csvContent, `额外消费_${new Date().toISOString().split('T')[0]}.csv`);
+    } catch (error) {
+        console.error('导出失败:', error);
+    }
+}
+
+// 导出到CSV文件或剪切板
+function exportToCSV(csvContent, filename) {
+    // 提供两个选项：下载文件或复制到剪切板
+    const choice = confirm('选择导出方式：\n确定 = 下载文件\n取消 = 复制到剪切板');
+    
+    if (choice) {
+        // 下载文件
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } else {
+        // 复制到剪切板
+        navigator.clipboard.writeText(csvContent).then(() => {
+            // 静默复制，不显示提示
+        }).catch(err => {
+            console.error('复制失败:', err);
+        });
+    }
+}
+
+// 显示导入模态框
+function showImportModal(type) {
+    if (!currentVehicleId) {
+        return;
+    }
+    
+    currentImportType = type;
+    const title = type === 'refuel' ? '导入加油记录' : '导入额外消费';
+    document.getElementById('importModalTitle').textContent = title;
+    document.getElementById('importDataText').value = '';
+    document.getElementById('importPreview').style.display = 'none';
+    document.getElementById('importModal').style.display = 'block';
+}
+
+// 从剪切板粘贴
+async function pasteFromClipboard() {
+    try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('importDataText').value = text;
+        previewImportData(text);
+    } catch (error) {
+        console.error('读取剪切板失败:', error);
+        alert('无法读取剪切板，请手动粘贴数据');
+    }
+}
+
+// 处理文件导入
+function handleFileImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const content = e.target.result;
+        document.getElementById('importDataText').value = content;
+        previewImportData(content);
+    };
+    reader.readAsText(file);
+}
+
+// 预览导入数据
+function previewImportData(text) {
+    const lines = text.trim().split('\n').slice(0, 6);
+    document.getElementById('importPreviewContent').textContent = lines.join('\n');
+    document.getElementById('importPreview').style.display = 'block';
+}
+
+// 处理导入
+async function processImport() {
+    if (!currentVehicleId || !currentImportType) {
+        return;
+    }
+
+    const text = document.getElementById('importDataText').value.trim();
+    if (!text) {
+        return;
+    }
+
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length < 2) {
+        return;
+    }
+
+    try {
+        if (currentImportType === 'refuel') {
+            await importRefuelRecords(lines);
+        } else {
+            await importExpenses(lines);
+        }
+        
+        closeModal('importModal');
+    } catch (error) {
+        console.error('导入失败:', error);
+    }
+}
+
+// 导入加油记录
+async function importRefuelRecords(lines) {
+    // 跳过表头
+    const dataLines = lines.slice(1);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const line of dataLines) {
+        const values = parseCSVLine(line);
+        if (values.length < 2) continue;
+
+        try {
+            // 解析数据：日期, 里程数, 增加里程数(忽略), 加油量, 总价, 单价(忽略), 油耗(忽略)
+            const dateStr = values[0].trim();
+            const mileage = parseFloat(values[1]);
+            const liters = values[3] && values[3] !== '--' ? parseFloat(values[3]) : null;
+            const price = values[4] && values[4] !== '--' ? parseFloat(values[4].replace('¥', '')) : null;
+
+            if (isNaN(mileage)) continue;
+
+            // 转换日期格式
+            let refuelDate;
+            if (dateStr.includes('-')) {
+                refuelDate = new Date(dateStr).toISOString();
+            } else {
+                refuelDate = new Date().toISOString();
+            }
+
+            const response = await fetch(`/api/vehicles/${currentVehicleId}/records`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    liters: liters || 0,
+                    price: price || 0,
+                    mileage: mileage,
+                    refuel_date: refuelDate
+                })
+            });
+
+            if (response.ok) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        } catch (error) {
+            failCount++;
+        }
+    }
+
+    // 刷新数据
+    loadVehicleRecords();
+    loadVehicleStats();
+    loadVehicles();
+}
+
+// 导入额外消费记录
+async function importExpenses(lines) {
+    // 跳过表头
+    const dataLines = lines.slice(1);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const line of dataLines) {
+        const values = parseCSVLine(line);
+        if (values.length < 3) continue;
+
+        try {
+            const dateStr = values[0].trim();
+            const title = values[1].replace(/^"|"$/g, '').trim();
+            const amount = parseFloat(values[2].replace('¥', ''));
+
+            if (!title || isNaN(amount)) continue;
+
+            // 转换日期格式
+            let expenseDate;
+            if (dateStr.includes('-')) {
+                expenseDate = new Date(dateStr).toISOString().split('T')[0];
+            } else {
+                expenseDate = new Date().toISOString().split('T')[0];
+            }
+
+            const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: title,
+                    amount: amount,
+                    expense_date: expenseDate
+                })
+            });
+
+            if (response.ok) {
+                successCount++;
+            } else {
+                failCount++;
+            }
+        } catch (error) {
+            failCount++;
+        }
+    }
+
+    // 刷新数据
+    loadExtraExpenses();
+}
+
+// 解析CSV行（处理引号内的逗号）
+function parseCSVLine(line) {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ',' && !inQuotes) {
+            values.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    values.push(current);
+    
+    return values;
+}

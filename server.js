@@ -144,6 +144,86 @@ app.get('/api/records', (req, res) => {
   });
 });
 
+// 获取车辆的额外消费记录
+app.get('/api/vehicles/:id/expenses', (req, res) => {
+  const vehicleId = parseInt(req.params.id);
+  db.getExtraExpenses(vehicleId, (err, expenses) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json(expenses);
+    }
+  });
+});
+
+// 添加额外消费记录
+app.post('/api/vehicles/:id/expenses', (req, res) => {
+  const vehicleId = parseInt(req.params.id);
+  const { title, amount, expense_date } = req.body;
+  if (!title || amount === undefined) {
+    return res.status(400).json({ error: '标题和金额为必填项' });
+  }
+  db.addExtraExpense(
+    vehicleId,
+    title,
+    parseFloat(amount),
+    expense_date,
+    (err, id) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+      } else {
+        res.json({ id, message: '额外消费记录添加成功' });
+      }
+    }
+  );
+});
+
+// 更新额外消费记录
+app.put('/api/expenses/:id', (req, res) => {
+  const expenseId = parseInt(req.params.id);
+  const { title, amount, expense_date } = req.body;
+  if (!title || amount === undefined || !expense_date) {
+    return res.status(400).json({ error: '所有字段为必填项' });
+  }
+  db.updateExtraExpense(
+    expenseId,
+    title,
+    parseFloat(amount),
+    expense_date,
+    (err) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+      } else {
+        res.json({ message: '额外消费记录更新成功' });
+      }
+    }
+  );
+});
+
+// 删除额外消费记录
+app.delete('/api/expenses/:id', (req, res) => {
+  const expenseId = parseInt(req.params.id);
+  db.deleteExtraExpense(expenseId, (err) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json({ message: '额外消费记录删除成功' });
+    }
+  });
+});
+
+// 获取车辆额外消费统计
+app.get('/api/vehicles/:id/expense-stats', (req, res) => {
+  const vehicleId = parseInt(req.params.id);
+  db.getExtraExpenseStats(vehicleId, (err, stats) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json(stats);
+    }
+  });
+});
+
 // 启动服务器
 app.listen(PORT, () => {
   console.log(`服务器运行在 http://localhost:${PORT}`);

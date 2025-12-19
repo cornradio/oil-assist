@@ -24,10 +24,31 @@
 
         <!-- 加油记录区域 -->
         <section class="section" id="refuelSection" style="display: none;">
-            <h2>加油记录</h2>
+            <div class="section-header">
+                <h2>加油记录</h2>
+                <div class="action-buttons-group">
+                    <button class="btn btn-primary btn-sm" onclick="exportRefuelRecords()">导出</button>
+                    <button class="btn btn-primary btn-sm" onclick="showImportModal('refuel')">导入</button>
+                </div>
+            </div>
             <div class="card">
                 <button class="btn btn-primary" onclick="showAddRecordModal()">+ 添加加油记录</button>
                 <div id="recordsList" class="records-list"></div>
+            </div>
+        </section>
+
+        <!-- 额外消费区域 -->
+        <section class="section" id="expenseSection" style="display: none;">
+            <div class="section-header">
+                <h2>额外消费</h2>
+                <div class="action-buttons-group">
+                    <button class="btn btn-primary btn-sm" onclick="exportExpenses()">导出</button>
+                    <button class="btn btn-primary btn-sm" onclick="showImportModal('expense')">导入</button>
+                </div>
+            </div>
+            <div class="card">
+                <button class="btn btn-primary" onclick="showAddExpenseModal()">+ 添加消费记录</button>
+                <div id="expensesList" class="records-list"></div>
             </div>
         </section>
 
@@ -137,6 +158,81 @@
                 </div>
                 <button type="submit" class="btn btn-primary">保存</button>
             </form>
+        </div>
+    </div>
+
+    <!-- 添加额外消费模态框 -->
+    <div id="addExpenseModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addExpenseModal')">&times;</span>
+            <h3>添加消费记录</h3>
+            <form id="addExpenseForm" onsubmit="addExtraExpense(event)">
+                <div class="form-group">
+                    <label>消费日期：</label>
+                    <input type="date" id="expenseDate" required>
+                </div>
+                <div class="form-group">
+                    <label>消费标题：</label>
+                    <input type="text" id="expenseTitle" required placeholder="例如：年检、保险、修车等">
+                </div>
+                <div class="form-group">
+                    <label>金额（元）：</label>
+                    <input type="number" id="expenseAmount" step="0.01" required placeholder="例如：500.00">
+                </div>
+                <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 编辑额外消费模态框 -->
+    <div id="editExpenseModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('editExpenseModal')">&times;</span>
+            <h3>编辑消费记录</h3>
+            <form id="editExpenseForm" onsubmit="updateExtraExpense(event)">
+                <input type="hidden" id="editExpenseId">
+                <div class="form-group">
+                    <label>消费日期：</label>
+                    <input type="date" id="editExpenseDate" required>
+                </div>
+                <div class="form-group">
+                    <label>消费标题：</label>
+                    <input type="text" id="editExpenseTitle" required placeholder="例如：年检、保险、修车等">
+                </div>
+                <div class="form-group">
+                    <label>金额（元）：</label>
+                    <input type="number" id="editExpenseAmount" step="0.01" required placeholder="例如：500.00">
+                </div>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 导入数据模态框 -->
+    <div id="importModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('importModal')">&times;</span>
+            <h3 id="importModalTitle">导入数据</h3>
+            <div class="form-group">
+                <label>选择导入方式：</label>
+                <div style="margin: 15px 0;">
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('importFileInput').click()" style="margin-right: 10px;">选择文件</button>
+                    <button type="button" class="btn btn-primary" onclick="pasteFromClipboard()">从剪切板粘贴</button>
+                </div>
+                <input type="file" id="importFileInput" accept=".csv,.txt" style="display: none;" onchange="handleFileImport(event)">
+            </div>
+            <div class="form-group">
+                <label>或直接粘贴CSV数据：</label>
+                <textarea id="importDataText" rows="10" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;" placeholder="粘贴CSV格式数据，第一行为表头"></textarea>
+            </div>
+            <div style="margin-top: 15px;">
+                <button type="button" class="btn btn-primary" onclick="processImport()">导入</button>
+                <button type="button" class="btn" onclick="closeModal('importModal')" style="margin-left: 10px;">取消</button>
+            </div>
+            <div id="importPreview" style="margin-top: 15px; display: none;">
+                <h4>预览（前5行）：</h4>
+                <pre id="importPreviewContent" style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 200px; overflow: auto;"></pre>
+            </div>
         </div>
     </div>
 

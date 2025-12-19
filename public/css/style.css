@@ -52,6 +52,11 @@ header h1 {
     margin-bottom: 0;
 }
 
+.action-buttons-group {
+    display: flex;
+    gap: 10px;
+}
+
 .btn-sm {
     padding: 8px 16px;
     font-size: 14px;
