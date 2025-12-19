@@ -66,7 +66,7 @@ app.get('/api/vehicles/:id/records', (req, res) => {
 // 添加加油记录
 app.post('/api/vehicles/:id/records', (req, res) => {
   const vehicleId = parseInt(req.params.id);
-  const { liters, price, mileage } = req.body;
+  const { liters, price, mileage, refuel_date } = req.body;
   if (!liters || !price || mileage === undefined) {
     return res.status(400).json({ error: '升数、价格和里程数为必填项' });
   }
@@ -75,6 +75,7 @@ app.post('/api/vehicles/:id/records', (req, res) => {
     parseFloat(liters),
     parseFloat(price),
     parseFloat(mileage),
+    refuel_date,
     (err, id) => {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -83,6 +84,41 @@ app.post('/api/vehicles/:id/records', (req, res) => {
       }
     }
   );
+});
+
+// 更新加油记录
+app.put('/api/records/:id', (req, res) => {
+  const recordId = parseInt(req.params.id);
+  const { liters, price, mileage, refuel_date } = req.body;
+  if (!liters || !price || mileage === undefined || !refuel_date) {
+    return res.status(400).json({ error: '所有字段为必填项' });
+  }
+  db.updateRefuelRecord(
+    recordId,
+    parseFloat(liters),
+    parseFloat(price),
+    parseFloat(mileage),
+    refuel_date,
+    (err) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+      } else {
+        res.json({ message: '加油记录更新成功' });
+      }
+    }
+  );
+});
+
+// 删除加油记录
+app.delete('/api/records/:id', (req, res) => {
+  const recordId = parseInt(req.params.id);
+  db.deleteRefuelRecord(recordId, (err) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json({ message: '加油记录删除成功' });
+    }
+  });
 });
 
 // 获取车辆统计信息

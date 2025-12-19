@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 点击页面其他地方时关闭菜单
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.vehicle-menu')) {
+        if (!e.target.closest('.vehicle-menu') && !e.target.closest('.record-menu')) {
             document.querySelectorAll('.menu-dropdown').forEach(menu => {
                 menu.style.display = 'none';
             });
@@ -77,6 +77,15 @@ function selectVehicle(vehicleId) {
     renderVehicles();
     document.getElementById('refuelSection').style.display = 'block';
     document.getElementById('statsSection').style.display = 'block';
+    
+    // 销毁所有现有图表
+    Object.values(charts).forEach(chart => {
+        if (chart) {
+            chart.destroy();
+        }
+    });
+    charts = {};
+    
     loadVehicleRecords();
     loadVehicleStats();
     
@@ -84,6 +93,25 @@ function selectVehicle(vehicleId) {
     document.querySelectorAll('.menu-dropdown').forEach(menu => {
         menu.style.display = 'none';
     });
+}
+
+// 刷新统计
+function refreshStats() {
+    if (!currentVehicleId) {
+        alert('请先选择车辆');
+        return;
+    }
+    
+    // 销毁所有现有图表
+    Object.values(charts).forEach(chart => {
+        if (chart) {
+            chart.destroy();
+        }
+    });
+    charts = {};
+    
+    loadVehicleStats();
+    loadVehicleRecords();
 }
 
 // 显示添加车辆模态框
@@ -210,6 +238,15 @@ function renderRecords(records) {
                 <td>¥${record.price.toFixed(2)}</td>
                 <td>¥${pricePerLiter}</td>
                 <td>${fuelConsumption}</td>
+                <td class="action-buttons">
+                    <div class="record-menu" onclick="event.stopPropagation()">
+                        <button class="menu-btn" onclick="toggleRecordMenu(${record.id})">⋯</button>
+                        <div class="menu-dropdown" id="record-menu-${record.id}" style="display: none;">
+                            <button class="menu-item" onclick="showEditRecordModal(${record.id})">编辑</button>
+                            <button class="menu-item menu-item-danger" onclick="deleteRecord(${record.id})">删除</button>
+                        </div>
+                    </div>
+                </td>
             </tr>
         `;
     }
@@ -224,6 +261,7 @@ function renderRecords(records) {
                     <th>总价 (元)</th>
                     <th>单价 (元/L)</th>
                     <th>油耗 (L/100km)</th>
+                    <th>操作</th>
                 </tr>
             </thead>
             <tbody>
@@ -242,10 +280,31 @@ function showAddRecordModal() {
     document.getElementById('addRecordModal').style.display = 'block';
     document.getElementById('addRecordForm').reset();
     
+    // 设置默认日期为当前时间
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById('recordDate').value = now.toISOString().slice(0, 16);
+    
     // 自动填充当前里程数
     const currentVehicle = vehicles.find(v => v.id === currentVehicleId);
     if (currentVehicle) {
         document.getElementById('recordMileage').value = currentVehicle.current_mileage;
+    }
+}
+
+// 切换记录菜单
+function toggleRecordMenu(recordId) {
+    // 关闭所有其他菜单
+    document.querySelectorAll('.menu-dropdown').forEach(menu => {
+        if (menu.id !== `record-menu-${recordId}`) {
+            menu.style.display = 'none';
+        }
+    });
+    
+    // 切换当前菜单
+    const menu = document.getElementById(`record-menu-${recordId}`);
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
 }
 
@@ -260,8 +319,9 @@ async function addRefuelRecord(event) {
     const liters = parseFloat(document.getElementById('recordLiters').value);
     const price = parseFloat(document.getElementById('recordPrice').value);
     const mileage = parseFloat(document.getElementById('recordMileage').value);
+    const refuelDate = document.getElementById('recordDate').value;
 
-    if (isNaN(liters) || isNaN(price) || isNaN(mileage)) {
+    if (isNaN(liters) || isNaN(price) || isNaN(mileage) || !refuelDate) {
         alert('请填写完整的加油信息');
         return;
     }
@@ -270,7 +330,7 @@ async function addRefuelRecord(event) {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/records`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ liters, price, mileage })
+            body: JSON.stringify({ liters, price, mileage, refuel_date: refuelDate })
         });
 
         const result = await response.json();
@@ -286,6 +346,117 @@ async function addRefuelRecord(event) {
     } catch (error) {
         console.error('添加记录失败:', error);
         alert('添加记录失败，请重试');
+    }
+}
+
+// 显示编辑记录模态框
+async function showEditRecordModal(recordId) {
+    if (!currentVehicleId) {
+        alert('请先选择车辆');
+        return;
+    }
+
+    // 关闭菜单
+    document.querySelectorAll('.menu-dropdown').forEach(menu => {
+        menu.style.display = 'none';
+    });
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/records`);
+        const records = await response.json();
+        const record = records.find(r => r.id === recordId);
+        
+        if (!record) {
+            alert('找不到该记录');
+            return;
+        }
+
+        // 填充表单
+        document.getElementById('editRecordId').value = record.id;
+        const date = new Date(record.refuel_date);
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        document.getElementById('editRecordDate').value = date.toISOString().slice(0, 16);
+        document.getElementById('editRecordLiters').value = record.liters;
+        document.getElementById('editRecordPrice').value = record.price;
+        document.getElementById('editRecordMileage').value = record.mileage;
+        
+        document.getElementById('editRecordModal').style.display = 'block';
+    } catch (error) {
+        console.error('加载记录失败:', error);
+        alert('加载记录失败，请重试');
+    }
+}
+
+// 更新加油记录
+async function updateRefuelRecord(event) {
+    event.preventDefault();
+    if (!currentVehicleId) {
+        alert('请先选择车辆');
+        return;
+    }
+
+    const recordId = parseInt(document.getElementById('editRecordId').value);
+    const liters = parseFloat(document.getElementById('editRecordLiters').value);
+    const price = parseFloat(document.getElementById('editRecordPrice').value);
+    const mileage = parseFloat(document.getElementById('editRecordMileage').value);
+    const refuelDate = document.getElementById('editRecordDate').value;
+
+    if (isNaN(liters) || isNaN(price) || isNaN(mileage) || !refuelDate) {
+        alert('请填写完整的加油信息');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/records/${recordId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ liters, price, mileage, refuel_date: refuelDate })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            closeModal('editRecordModal');
+            loadVehicleRecords();
+            loadVehicleStats();
+            loadVehicles(); // 更新车辆里程
+            alert('加油记录更新成功！');
+        } else {
+            alert('更新失败：' + result.error);
+        }
+    } catch (error) {
+        console.error('更新记录失败:', error);
+        alert('更新记录失败，请重试');
+    }
+}
+
+// 删除加油记录
+async function deleteRecord(recordId) {
+    // 关闭菜单
+    document.querySelectorAll('.menu-dropdown').forEach(menu => {
+        menu.style.display = 'none';
+    });
+
+    if (!confirm('确定要删除这条加油记录吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/records/${recordId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            loadVehicleRecords();
+            loadVehicleStats();
+            loadVehicles(); // 更新车辆里程
+            alert('加油记录删除成功！');
+        } else {
+            alert('删除失败：' + result.error);
+        }
+    } catch (error) {
+        console.error('删除记录失败:', error);
+        alert('删除记录失败，请重试');
     }
 }
 

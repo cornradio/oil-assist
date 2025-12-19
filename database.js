@@ -81,10 +81,11 @@ function deleteVehicle(vehicleId, callback) {
 }
 
 // 添加加油记录
-function addRefuelRecord(vehicleId, liters, price, mileage, callback) {
+function addRefuelRecord(vehicleId, liters, price, mileage, refuelDate, callback) {
+  const date = refuelDate || new Date().toISOString();
   db.run(
-    'INSERT INTO refuel_records (vehicle_id, liters, price, mileage) VALUES (?, ?, ?, ?)',
-    [vehicleId, liters, price, mileage],
+    'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date) VALUES (?, ?, ?, ?, ?)',
+    [vehicleId, liters, price, mileage, date],
     function(err) {
       if (err) {
         callback(err);
@@ -96,6 +97,73 @@ function addRefuelRecord(vehicleId, liters, price, mileage, callback) {
       }
     }
   );
+}
+
+// 更新加油记录
+function updateRefuelRecord(recordId, liters, price, mileage, refuelDate, callback) {
+  db.run(
+    'UPDATE refuel_records SET liters = ?, price = ?, mileage = ?, refuel_date = ? WHERE id = ?',
+    [liters, price, mileage, refuelDate, recordId],
+    function(err) {
+      if (err) {
+        callback(err);
+      } else {
+        // 获取车辆ID以更新里程
+        db.get('SELECT vehicle_id FROM refuel_records WHERE id = ?', [recordId], (err, row) => {
+          if (err) {
+            callback(err);
+          } else if (row) {
+            // 更新车辆当前里程为最大里程
+            db.get(
+              'SELECT MAX(mileage) as max_mileage FROM refuel_records WHERE vehicle_id = ?',
+              [row.vehicle_id],
+              (err, result) => {
+                if (!err && result) {
+                  updateVehicleMileage(row.vehicle_id, result.max_mileage || mileage, callback);
+                } else {
+                  callback(null);
+                }
+              }
+            );
+          } else {
+            callback(null);
+          }
+        });
+      }
+    }
+  );
+}
+
+// 删除加油记录
+function deleteRefuelRecord(recordId, callback) {
+  // 先获取记录信息
+  db.get('SELECT vehicle_id, mileage FROM refuel_records WHERE id = ?', [recordId], (err, record) => {
+    if (err) {
+      callback(err);
+    } else {
+      // 删除记录
+      db.run('DELETE FROM refuel_records WHERE id = ?', [recordId], (err) => {
+        if (err) {
+          callback(err);
+        } else if (record) {
+          // 更新车辆当前里程为剩余记录的最大里程
+          db.get(
+            'SELECT MAX(mileage) as max_mileage FROM refuel_records WHERE vehicle_id = ?',
+            [record.vehicle_id],
+            (err, result) => {
+              if (!err && result) {
+                updateVehicleMileage(record.vehicle_id, result.max_mileage || 0, callback);
+              } else {
+                callback(null);
+              }
+            }
+          );
+        } else {
+          callback(null);
+        }
+      });
+    }
+  });
 }
 
 // 获取车辆的加油记录
@@ -178,6 +246,8 @@ module.exports = {
   updateVehicleMileage,
   deleteVehicle,
   addRefuelRecord,
+  updateRefuelRecord,
+  deleteRefuelRecord,
   getRefuelRecords,
   getAllRefuelRecords,
   getVehicleStats

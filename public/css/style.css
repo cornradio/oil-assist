@@ -41,6 +41,23 @@ header h1 {
     font-weight: 600;
 }
 
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.section-header h2 {
+    margin-bottom: 0;
+}
+
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 14px;
+    margin-bottom: 0;
+}
+
 .card {
     background: white;
     border-radius: 4px;
@@ -209,6 +226,65 @@ header h1 {
 
 .records-table tbody tr:last-child td {
     border-bottom: none;
+}
+
+.action-buttons {
+    white-space: nowrap;
+    text-align: center;
+}
+
+.record-menu {
+    position: relative;
+    display: inline-block;
+}
+
+.record-menu .menu-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #666;
+    cursor: pointer;
+    padding: 5px 10px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.record-menu .menu-btn:hover {
+    color: #2c3e50;
+}
+
+.record-menu .menu-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 100;
+    min-width: 100px;
+    margin-top: 5px;
+}
+
+.record-menu .menu-item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    transition: background 0.2s;
+}
+
+.record-menu .menu-item:hover {
+    background: #f5f5f5;
+}
+
+.record-menu .menu-item-danger {
+    color: #e74c3c;
 }
 
 .stats-info {

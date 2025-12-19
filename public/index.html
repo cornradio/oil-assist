@@ -33,7 +33,10 @@
 
         <!-- 统计图表区域 -->
         <section class="section" id="statsSection" style="display: none;">
-            <h2>统计图表</h2>
+            <div class="section-header">
+                <h2>统计图表</h2>
+                <button class="btn btn-primary btn-sm" onclick="refreshStats()">刷新</button>
+            </div>
             <div class="card">
                 <div class="stats-info" id="statsInfo"></div>
                 <div class="charts-container">
@@ -77,6 +80,10 @@
             <h3>添加加油记录</h3>
             <form id="addRecordForm" onsubmit="addRefuelRecord(event)">
                 <div class="form-group">
+                    <label>加油日期时间：</label>
+                    <input type="datetime-local" id="recordDate" required>
+                </div>
+                <div class="form-group">
                     <label>加油升数（L）：</label>
                     <input type="number" id="recordLiters" step="0.01" required placeholder="例如：50.5">
                 </div>
@@ -89,6 +96,34 @@
                     <input type="number" id="recordMileage" step="0.1" required placeholder="例如：50100">
                 </div>
                 <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 编辑加油记录模态框 -->
+    <div id="editRecordModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('editRecordModal')">&times;</span>
+            <h3>编辑加油记录</h3>
+            <form id="editRecordForm" onsubmit="updateRefuelRecord(event)">
+                <input type="hidden" id="editRecordId">
+                <div class="form-group">
+                    <label>加油日期时间：</label>
+                    <input type="datetime-local" id="editRecordDate" required>
+                </div>
+                <div class="form-group">
+                    <label>加油升数（L）：</label>
+                    <input type="number" id="editRecordLiters" step="0.01" required placeholder="例如：50.5">
+                </div>
+                <div class="form-group">
+                    <label>价格（元）：</label>
+                    <input type="number" id="editRecordPrice" step="0.01" required placeholder="例如：350.00">
+                </div>
+                <div class="form-group">
+                    <label>加油时里程数（公里）：</label>
+                    <input type="number" id="editRecordMileage" step="0.1" required placeholder="例如：50100">
+                </div>
+                <button type="submit" class="btn btn-primary">保存</button>
             </form>
         </div>
     </div>
