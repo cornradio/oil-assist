@@ -21,10 +21,10 @@ docker build -t kasusa/oil-assist:v1.0.0 .
 构建完成后，可以在本地测试运行：
 
 ```bash
-docker run -d -p 3000:3000 --name oil-assist kasusa/oil-assist:latest
+docker run -d -p 3088:3000 --name oil-assist kasusa/oil-assist:latest
 ```
 
-访问 http://localhost:3000 查看应用是否正常运行。
+访问 http://localhost:3088 查看应用是否正常运行。
 
 停止容器：
 
@@ -165,3 +165,9 @@ docker push kasusa/oil-assist:latest
    docker push kasusa/oil-assist:latest
    ```
 
+
+   
+## 离线使用 Docker 镜像
+docker save -o oil.tar kasusa/oil-assist:latest
+docker load -i oil.tar
+docker run -d -p 3088:3000 --name oil-assist kasusa/oil-assist:latest
