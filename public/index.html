@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>油耗记录系统</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>油耗记录系统</h1>
+        </header>
+
+        <!-- 车辆管理区域 -->
+        <section class="section">
+            <h2>车辆管理</h2>
+            <div class="card">
+                <button class="btn btn-primary" onclick="showAddVehicleModal()">+ 添加车辆</button>
+                <div id="vehiclesList" class="vehicles-list"></div>
+            </div>
+        </section>
+
+        <!-- 加油记录区域 -->
+        <section class="section" id="refuelSection" style="display: none;">
+            <h2>加油记录</h2>
+            <div class="card">
+                <button class="btn btn-primary" onclick="showAddRecordModal()">+ 添加加油记录</button>
+                <div id="recordsList" class="records-list"></div>
+            </div>
+        </section>
+
+        <!-- 统计图表区域 -->
+        <section class="section" id="statsSection" style="display: none;">
+            <h2>统计图表</h2>
+            <div class="card">
+                <div class="stats-info" id="statsInfo"></div>
+                <div class="charts-container">
+                    <div class="chart-wrapper">
+                        <canvas id="fuelConsumptionChart"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="costChart"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- 添加车辆模态框 -->
+    <div id="addVehicleModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addVehicleModal')">&times;</span>
+            <h3>添加车辆</h3>
+            <form id="addVehicleForm" onsubmit="addVehicle(event)">
+                <div class="form-group">
+                    <label>车辆名称：</label>
+                    <input type="text" id="vehicleName" required placeholder="例如：我的车">
+                </div>
+                <div class="form-group">
+                    <label>当前里程数（公里）：</label>
+                    <input type="number" id="vehicleMileage" step="0.1" required placeholder="例如：50000">
+                </div>
+                <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 添加加油记录模态框 -->
+    <div id="addRecordModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addRecordModal')">&times;</span>
+            <h3>添加加油记录</h3>
+            <form id="addRecordForm" onsubmit="addRefuelRecord(event)">
+                <div class="form-group">
+                    <label>加油升数（L）：</label>
+                    <input type="number" id="recordLiters" step="0.01" required placeholder="例如：50.5">
+                </div>
+                <div class="form-group">
+                    <label>价格（元）：</label>
+                    <input type="number" id="recordPrice" step="0.01" required placeholder="例如：350.00">
+                </div>
+                <div class="form-group">
+                    <label>加油时里程数（公里）：</label>
+                    <input type="number" id="recordMileage" step="0.1" required placeholder="例如：50100">
+                </div>
+                <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
+
+
