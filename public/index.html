@@ -394,6 +394,21 @@
         </div>
     </div>
 
+    <!-- 导出选择模态框 -->
+    <div id="exportModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('exportModal')">&times;</span>
+            <h3>导出加油记录</h3>
+            <div style="padding: 20px 0;">
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <button class="btn btn-primary" onclick="exportSimpleCSV()" style="width: 100%;">导出简单CSV</button>
+                    <button class="btn btn-primary" onclick="exportFullTableCSV()" style="width: 100%;">导出完整表格</button>
+                    <button class="btn" onclick="copyRecordsToClipboard()" style="width: 100%;">复制到剪切板</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="js/app.js"></script>
 </body>
 </html>

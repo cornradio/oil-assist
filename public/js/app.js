@@ -1945,8 +1945,18 @@ async function deleteMaintenanceRecord(recordId) {
 // 全局变量：当前导入类型
 let currentImportType = null;
 
-// 导出加油记录
+// 导出加油记录（显示选择模态框）
 async function exportRefuelRecords() {
+    if (!currentVehicleId) {
+        return;
+    }
+
+    // 显示导出选择模态框
+    document.getElementById('exportModal').style.display = 'block';
+}
+
+// 导出简单CSV（只包含三个关键字段）
+async function exportSimpleCSV() {
     if (!currentVehicleId) {
         return;
     }
@@ -1956,6 +1966,8 @@ async function exportRefuelRecords() {
         const records = await response.json();
         
         if (records.length === 0) {
+            alert('暂无记录可导出');
+            closeModal('exportModal');
             return;
         }
 
@@ -2005,10 +2017,183 @@ async function exportRefuelRecords() {
         
         // 生成文件名：车辆名字-加油记录-时间.csv
         const filename = `${sanitizedName}-加油记录-${timestamp}.csv`;
-        exportToCSV(csvContent, filename);
+        
+        // 下载CSV文件
+        downloadCSV(csvContent, filename);
+        closeModal('exportModal');
     } catch (error) {
         console.error('导出失败:', error);
+        alert('导出失败，请重试');
     }
+}
+
+// 导出完整表格CSV
+async function exportFullTableCSV() {
+    if (!currentVehicleId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/records`);
+        const records = await response.json();
+        
+        if (records.length === 0) {
+            alert('暂无记录可导出');
+            closeModal('exportModal');
+            return;
+        }
+
+        // 按里程数从小到大排序，用于计算
+        const sortedByMileage = [...records].sort((a, b) => a.mileage - b.mileage);
+        
+        // 创建里程到记录的映射
+        const mileageMap = new Map();
+        sortedByMileage.forEach((r, i) => {
+            mileageMap.set(r.id, i);
+        });
+
+        // 生成CSV内容，包含所有字段
+        const headers = ['日期', '里程数(km)', '增加里程数(km)', '加油量(L)', '总价(元)', '单价(元/L)', '油耗(L/100km)', '每公里费用(元/km)'];
+        const rows = [headers.join(',')];
+
+        // 按里程数从小到大排序导出
+        for (let i = 0; i < sortedByMileage.length; i++) {
+            const record = sortedByMileage[i];
+            
+            // 检查是否为初始记录
+            const isInitialRecord = record.liters === null || record.liters === undefined || record.liters === 0 || 
+                                    record.price === null || record.price === undefined || record.price === 0;
+            
+            const liters = isInitialRecord ? 0 : record.liters.toFixed(2);
+            const price = isInitialRecord ? 0 : record.price.toFixed(2);
+            const pricePerLiter = isInitialRecord ? '' : (record.price / record.liters).toFixed(2);
+            
+            let mileageIncrease = '';
+            let fuelConsumption = '';
+            let costPerKm = '';
+            
+            // 计算增加里程数、油耗、每公里费用
+            if (i > 0) {
+                const prevRecord = sortedByMileage[i - 1];
+                const distance = record.mileage - prevRecord.mileage;
+                if (distance > 0) {
+                    mileageIncrease = distance.toFixed(1);
+                    if (record.liters && record.liters > 0) {
+                        fuelConsumption = (record.liters / distance * 100).toFixed(2);
+                    }
+                    if (record.price && record.price > 0) {
+                        costPerKm = (record.price / distance).toFixed(2);
+                    }
+                }
+            }
+            
+            const row = [
+                formatDate(record.refuel_date),
+                record.mileage.toFixed(1),
+                mileageIncrease || '',
+                liters,
+                price,
+                pricePerLiter || '',
+                fuelConsumption || '',
+                costPerKm || ''
+            ];
+            rows.push(row.join(','));
+        }
+
+        const csvContent = rows.join('\n');
+        
+        // 获取当前车辆名称
+        const currentVehicle = vehicles.find(v => v.id === currentVehicleId);
+        const vehicleName = currentVehicle ? currentVehicle.name : '未知车辆';
+        
+        // 清理车辆名称中的特殊字符
+        const sanitizedName = vehicleName.replace(/[\/\\:*?"<>|]/g, '_');
+        
+        // 生成时间戳
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timestamp = `${year}${month}${day}-${hours}${minutes}${seconds}`;
+        
+        // 生成文件名：车辆名字-加油记录完整-时间.csv
+        const filename = `${sanitizedName}-加油记录完整-${timestamp}.csv`;
+        
+        // 下载CSV文件
+        downloadCSV(csvContent, filename);
+        closeModal('exportModal');
+    } catch (error) {
+        console.error('导出失败:', error);
+        alert('导出失败，请重试');
+    }
+}
+
+// 复制记录到剪切板
+async function copyRecordsToClipboard() {
+    if (!currentVehicleId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/records`);
+        const records = await response.json();
+        
+        if (records.length === 0) {
+            alert('暂无记录可复制');
+            closeModal('exportModal');
+            return;
+        }
+
+        // 按里程数从小到大排序
+        const sortedRecords = [...records].sort((a, b) => a.mileage - b.mileage);
+
+        // 生成简单CSV内容（复制到剪切板使用简单格式）
+        const headers = ['里程数(km)', '加油量(L)', '加油价格(元)'];
+        const rows = [headers.join('\t')]; // 使用制表符，方便粘贴到Excel等软件
+
+        for (let i = 0; i < sortedRecords.length; i++) {
+            const record = sortedRecords[i];
+            
+            const liters = (record.liters !== null && record.liters !== undefined && record.liters > 0) 
+                ? record.liters.toFixed(2) : '0';
+            const price = (record.price !== null && record.price !== undefined && record.price > 0) 
+                ? record.price.toFixed(2) : '0';
+            
+            const row = [
+                record.mileage.toFixed(1),
+                liters,
+                price
+            ];
+            rows.push(row.join('\t'));
+        }
+
+        const content = rows.join('\n');
+        
+        // 复制到剪切板
+        await navigator.clipboard.writeText(content);
+        alert('已复制到剪切板');
+        closeModal('exportModal');
+    } catch (error) {
+        console.error('复制失败:', error);
+        alert('复制失败，请重试');
+    }
+}
+
+// 下载CSV文件（网页内置方式）
+function downloadCSV(csvContent, filename) {
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 }
 
 // 导出额外消费记录
