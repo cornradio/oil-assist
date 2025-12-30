@@ -534,6 +534,7 @@ async function addRefuelRecord(event) {
             loadVehicleRecords();
             loadVehicleStats();
             loadVehicles(); // 更新车辆里程
+            loadMaintenanceData(); // 刷新维保模块
         } else {
             console.error('添加失败：', result.error);
         }
@@ -607,6 +608,7 @@ async function updateRefuelRecord(event) {
             loadVehicleRecords();
             loadVehicleStats();
             loadVehicles(); // 更新车辆里程
+            loadMaintenanceData(); // 刷新维保模块
         } else {
             console.error('更新失败：', result.error);
         }
@@ -636,6 +638,7 @@ async function deleteRecord(recordId) {
             loadVehicleRecords();
             loadVehicleStats();
             loadVehicles(); // 更新车辆里程
+            loadMaintenanceData(); // 刷新维保模块
         } else {
             console.error('删除失败：', result.error);
         }
@@ -2036,6 +2039,7 @@ async function importRefuelRecords(lines) {
     loadVehicleRecords();
     loadVehicleStats();
     loadVehicles();
+    loadMaintenanceData(); // 刷新维保模块
 }
 
 // 导入额外消费记录
@@ -2144,6 +2148,7 @@ async function clearRefuelRecords() {
             loadVehicleRecords();
             loadVehicleStats();
             loadVehicles();
+            loadMaintenanceData(); // 刷新维保模块
         } else {
             console.error('清空失败：', result.error);
         }
