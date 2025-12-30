@@ -35,10 +35,16 @@ function initDatabase() {
     price REAL,
     mileage REAL NOT NULL,
     refuel_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    image_path TEXT,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
   )`, (err) => {
     if (err) {
       console.error('创建加油记录表错误:', err.message);
+    } else {
+      // 添加image_path字段（如果表已存在但字段不存在）
+      db.run(`ALTER TABLE refuel_records ADD COLUMN image_path TEXT`, (alterErr) => {
+        // 忽略错误（字段可能已存在）
+      });
     }
   });
 
@@ -49,10 +55,16 @@ function initDatabase() {
     title TEXT NOT NULL,
     amount REAL NOT NULL,
     expense_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    image_path TEXT,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
   )`, (err) => {
     if (err) {
       console.error('创建额外消费表错误:', err.message);
+    } else {
+      // 添加image_path字段（如果表已存在但字段不存在）
+      db.run(`ALTER TABLE extra_expenses ADD COLUMN image_path TEXT`, (alterErr) => {
+        // 忽略错误（字段可能已存在）
+      });
     }
   });
 
@@ -78,10 +90,16 @@ function initDatabase() {
     mileage REAL NOT NULL,
     description TEXT,
     amount REAL NOT NULL,
+    image_path TEXT,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
   )`, (err) => {
     if (err) {
       console.error('创建维保记录表错误:', err.message);
+    } else {
+      // 添加image_path字段（如果表已存在但字段不存在）
+      db.run(`ALTER TABLE maintenance_records ADD COLUMN image_path TEXT`, (alterErr) => {
+        // 忽略错误（字段可能已存在）
+      });
     }
   });
 }
@@ -139,14 +157,14 @@ function deleteVehicle(vehicleId, callback) {
 }
 
 // 添加加油记录
-function addRefuelRecord(vehicleId, liters, price, mileage, refuelDate, callback) {
+function addRefuelRecord(vehicleId, liters, price, mileage, refuelDate, imagePath, callback) {
   const date = refuelDate || new Date().toISOString();
   // 如果liters或price为空或0，设置为null（初始记录）
   const litersValue = (liters === null || liters === undefined || liters === '' || liters === 0) ? null : liters;
   const priceValue = (price === null || price === undefined || price === '' || price === 0) ? null : price;
   db.run(
-    'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date) VALUES (?, ?, ?, ?, ?)',
-    [vehicleId, litersValue, priceValue, mileage, date],
+    'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date, image_path) VALUES (?, ?, ?, ?, ?, ?)',
+    [vehicleId, litersValue, priceValue, mileage, date, imagePath || null],
     function(err) {
       if (err) {
         callback(err);
@@ -161,10 +179,10 @@ function addRefuelRecord(vehicleId, liters, price, mileage, refuelDate, callback
 }
 
 // 更新加油记录
-function updateRefuelRecord(recordId, liters, price, mileage, refuelDate, callback) {
+function updateRefuelRecord(recordId, liters, price, mileage, refuelDate, imagePath, callback) {
   db.run(
-    'UPDATE refuel_records SET liters = ?, price = ?, mileage = ?, refuel_date = ? WHERE id = ?',
-    [liters, price, mileage, refuelDate, recordId],
+    'UPDATE refuel_records SET liters = ?, price = ?, mileage = ?, refuel_date = ?, image_path = ? WHERE id = ?',
+    [liters, price, mileage, refuelDate, imagePath || null, recordId],
     function(err) {
       if (err) {
         callback(err);
@@ -310,11 +328,11 @@ function getExtraExpenses(vehicleId, callback) {
 }
 
 // 添加额外消费记录
-function addExtraExpense(vehicleId, title, amount, expenseDate, callback) {
+function addExtraExpense(vehicleId, title, amount, expenseDate, imagePath, callback) {
   const date = expenseDate || new Date().toISOString();
   db.run(
-    'INSERT INTO extra_expenses (vehicle_id, title, amount, expense_date) VALUES (?, ?, ?, ?)',
-    [vehicleId, title, amount, date],
+    'INSERT INTO extra_expenses (vehicle_id, title, amount, expense_date, image_path) VALUES (?, ?, ?, ?, ?)',
+    [vehicleId, title, amount, date, imagePath || null],
     function(err) {
       callback(err, this.lastID);
     }
@@ -322,10 +340,10 @@ function addExtraExpense(vehicleId, title, amount, expenseDate, callback) {
 }
 
 // 更新额外消费记录
-function updateExtraExpense(expenseId, title, amount, expenseDate, callback) {
+function updateExtraExpense(expenseId, title, amount, expenseDate, imagePath, callback) {
   db.run(
-    'UPDATE extra_expenses SET title = ?, amount = ?, expense_date = ? WHERE id = ?',
-    [title, amount, expenseDate, expenseId],
+    'UPDATE extra_expenses SET title = ?, amount = ?, expense_date = ?, image_path = ? WHERE id = ?',
+    [title, amount, expenseDate, imagePath || null, expenseId],
     callback
   );
 }
@@ -438,11 +456,11 @@ function getLastMaintenanceRecord(vehicleId, intervalKm, callback) {
 }
 
 // 添加维保记录
-function addMaintenanceRecord(vehicleId, mileage, description, amount, maintenanceDate, callback) {
+function addMaintenanceRecord(vehicleId, mileage, description, amount, maintenanceDate, imagePath, callback) {
   const date = maintenanceDate || new Date().toISOString();
   db.run(
-    'INSERT INTO maintenance_records (vehicle_id, mileage, description, amount, maintenance_date) VALUES (?, ?, ?, ?, ?)',
-    [vehicleId, mileage, description || null, amount, date],
+    'INSERT INTO maintenance_records (vehicle_id, mileage, description, amount, maintenance_date, image_path) VALUES (?, ?, ?, ?, ?, ?)',
+    [vehicleId, mileage, description || null, amount, date, imagePath || null],
     function(err) {
       callback(err, this.lastID);
     }
@@ -450,10 +468,10 @@ function addMaintenanceRecord(vehicleId, mileage, description, amount, maintenan
 }
 
 // 更新维保记录
-function updateMaintenanceRecord(recordId, mileage, description, amount, maintenanceDate, callback) {
+function updateMaintenanceRecord(recordId, mileage, description, amount, maintenanceDate, imagePath, callback) {
   db.run(
-    'UPDATE maintenance_records SET mileage = ?, description = ?, amount = ?, maintenance_date = ? WHERE id = ?',
-    [mileage, description, amount, maintenanceDate, recordId],
+    'UPDATE maintenance_records SET mileage = ?, description = ?, amount = ?, maintenance_date = ?, image_path = ? WHERE id = ?',
+    [mileage, description, amount, maintenanceDate, imagePath || null, recordId],
     callback
   );
 }

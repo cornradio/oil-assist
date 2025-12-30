@@ -169,6 +169,15 @@
                 <div class="form-group" id="addRecordCalculatedValue" style="display: none; color: #666; font-size: 14px; margin-top: -10px;">
                     <span id="addRecordCalculatedText"></span>
                 </div>
+                <div class="form-group">
+                    <label>图片（可选）：</label>
+                    <input type="file" id="addRecordImage" accept="image/*" onchange="handleImageUpload('add', 'record', this)">
+                    <input type="hidden" id="addRecordImagePath">
+                    <div id="addRecordImagePreview" style="margin-top: 10px; display: none;">
+                        <img id="addRecordImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('add', 'record')" style="margin-left: 10px;">删除</button>
+                    </div>
+                </div>
                 <button type="submit" class="btn btn-primary">添加</button>
             </form>
         </div>
@@ -208,6 +217,15 @@
                 <div class="form-group" id="editRecordCalculatedValue" style="display: none; color: #666; font-size: 14px; margin-top: -10px;">
                     <span id="editRecordCalculatedText"></span>
                 </div>
+                <div class="form-group">
+                    <label>图片（可选）：</label>
+                    <input type="file" id="editRecordImage" accept="image/*" onchange="handleImageUpload('edit', 'record', this)">
+                    <input type="hidden" id="editRecordImagePath">
+                    <div id="editRecordImagePreview" style="margin-top: 10px; display: none;">
+                        <img id="editRecordImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('edit', 'record')" style="margin-left: 10px;">删除</button>
+                    </div>
+                </div>
                 <button type="submit" class="btn btn-primary">保存</button>
             </form>
         </div>
@@ -226,6 +244,15 @@
                 <div class="form-group">
                     <label>金额（元）：</label>
                     <input type="number" id="expenseAmount" step="0.01" required placeholder="例如：500.00">
+                </div>
+                <div class="form-group">
+                    <label>图片（可选）：</label>
+                    <input type="file" id="addExpenseImage" accept="image/*" onchange="handleImageUpload('add', 'expense', this)">
+                    <input type="hidden" id="addExpenseImagePath">
+                    <div id="addExpenseImagePreview" style="margin-top: 10px; display: none;">
+                        <img id="addExpenseImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('add', 'expense')" style="margin-left: 10px;">删除</button>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary">添加</button>
             </form>
@@ -246,6 +273,15 @@
                 <div class="form-group">
                     <label>金额（元）：</label>
                     <input type="number" id="editExpenseAmount" step="0.01" required placeholder="例如：500.00">
+                </div>
+                <div class="form-group">
+                    <label>图片（可选）：</label>
+                    <input type="file" id="editExpenseImage" accept="image/*" onchange="handleImageUpload('edit', 'expense', this)">
+                    <input type="hidden" id="editExpenseImagePath">
+                    <div id="editExpenseImagePreview" style="margin-top: 10px; display: none;">
+                        <img id="editExpenseImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('edit', 'expense')" style="margin-left: 10px;">删除</button>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary">保存</button>
             </form>
@@ -293,6 +329,15 @@
                     <label>花费金额（元）：</label>
                     <input type="number" id="maintenanceRecordAmount" step="0.01" required placeholder="例如：200.00">
                 </div>
+                <div class="form-group">
+                    <label>图片（可选）：</label>
+                    <input type="file" id="addMaintenanceRecordImage" accept="image/*" onchange="handleImageUpload('add', 'maintenanceRecord', this)">
+                    <input type="hidden" id="addMaintenanceRecordImagePath">
+                    <div id="addMaintenanceRecordImagePreview" style="margin-top: 10px; display: none;">
+                        <img id="addMaintenanceRecordImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('add', 'maintenance')" style="margin-left: 10px;">删除</button>
+                    </div>
+                </div>
                 <button type="submit" class="btn btn-primary">添加</button>
             </form>
         </div>
@@ -320,6 +365,15 @@
                 <div class="form-group">
                     <label>花费金额（元）：</label>
                     <input type="number" id="editMaintenanceRecordAmount" step="0.01" required placeholder="例如：200.00">
+                </div>
+                <div class="form-group">
+                    <label>图片（可选）：</label>
+                    <input type="file" id="editMaintenanceRecordImage" accept="image/*" onchange="handleImageUpload('edit', 'maintenanceRecord', this)">
+                    <input type="hidden" id="editMaintenanceRecordImagePath">
+                    <div id="editMaintenanceRecordImagePreview" style="margin-top: 10px; display: none;">
+                        <img id="editMaintenanceRecordImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('edit', 'maintenance')" style="margin-left: 10px;">删除</button>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary">保存</button>
             </form>

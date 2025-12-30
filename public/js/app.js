@@ -447,6 +447,10 @@ function renderRecords(records) {
             }
         }
         
+        const imageCell = record.image_path 
+            ? `<td><img src="${record.image_path}" alt="记录图片" style="max-width: 80px; max-height: 80px; border-radius: 4px; cursor: pointer;" onclick="showImageModal('${record.image_path}')"></td>`
+            : '<td>--</td>';
+        
         tableRows += `
             <tr>
                 <td>${formatDate(record.refuel_date)}</td>
@@ -457,6 +461,7 @@ function renderRecords(records) {
                 <td>${pricePerLiter}</td>
                 <td>${fuelConsumption}</td>
                 <td>${costPerKm}</td>
+                ${imageCell}
                 <td class="action-buttons">
                     <div class="record-menu" onclick="event.stopPropagation()">
                         <button class="menu-btn" onclick="toggleRecordMenu(${record.id})">⋯</button>
@@ -482,6 +487,7 @@ function renderRecords(records) {
                     <th>单价 (元/L)</th>
                     <th>油耗 (L/100km)</th>
                     <th>每公里费用 (元/km)</th>
+                    <th>图片</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -502,6 +508,9 @@ function showAddRecordModal() {
     
     // 重置输入模式为加油量
     setRecordInputMode('add', 'liters');
+    
+    // 清空图片
+    removeImage('add', 'record');
     
     // 设置默认日期为当前时间
     const now = new Date();
@@ -647,16 +656,20 @@ async function addRefuelRecord(event) {
         liters = price / inputValue;
     }
 
+    const imagePath = document.getElementById('addRecordImagePath').value;
+
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/records`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ liters, price, mileage, refuel_date: refuelDate })
+            body: JSON.stringify({ liters, price, mileage, refuel_date: refuelDate, image_path: imagePath || null })
         });
 
         const result = await response.json();
         if (response.ok) {
             closeModal('addRecordModal');
+            // 清空图片相关
+            removeImage('add', 'record');
             loadVehicleRecords();
             loadVehicleStats();
             loadVehicles(); // 更新车辆里程
@@ -701,6 +714,16 @@ async function showEditRecordModal(recordId) {
         document.getElementById('editRecordPrice').value = record.price || '';
         document.getElementById('editRecordMileage').value = record.mileage;
         
+        // 加载图片
+        if (record.image_path) {
+            document.getElementById('editRecordImagePath').value = record.image_path;
+            document.getElementById('editRecordImagePreview').style.display = 'block';
+            document.getElementById('editRecordImagePreviewImg').src = record.image_path;
+        } else {
+            document.getElementById('editRecordImagePath').value = '';
+            document.getElementById('editRecordImagePreview').style.display = 'none';
+        }
+        
         document.getElementById('editRecordModal').style.display = 'block';
     } catch (error) {
         console.error('加载记录失败:', error);
@@ -739,11 +762,13 @@ async function updateRefuelRecord(event) {
         liters = price / inputValue;
     }
 
+    const imagePath = document.getElementById('editRecordImagePath').value;
+
     try {
         const response = await fetch(`/api/records/${recordId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ liters, price, mileage, refuel_date: refuelDate })
+            body: JSON.stringify({ liters, price, mileage, refuel_date: refuelDate, image_path: imagePath || null })
         });
 
         const result = await response.json();
@@ -1371,10 +1396,15 @@ function renderExpenses(expenses) {
     let tableRows = '';
     for (let i = 0; i < expenses.length; i++) {
         const expense = expenses[i];
+        const imageCell = expense.image_path 
+            ? `<td><img src="${expense.image_path}" alt="记录图片" style="max-width: 80px; max-height: 80px; border-radius: 4px; cursor: pointer;" onclick="showImageModal('${expense.image_path}')"></td>`
+            : '<td>--</td>';
+        
         tableRows += `
             <tr>
                 <td>${formatDate(expense.expense_date)}</td>
                 <td>¥${expense.amount.toFixed(2)}</td>
+                ${imageCell}
                 <td class="action-buttons">
                     <div class="record-menu" onclick="event.stopPropagation()">
                         <button class="menu-btn" onclick="toggleExpenseMenu(${expense.id})">⋯</button>
@@ -1394,6 +1424,7 @@ function renderExpenses(expenses) {
                 <tr>
                     <th>日期</th>
                     <th>金额 (元)</th>
+                    <th>图片</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -1428,6 +1459,9 @@ function showAddExpenseModal() {
     document.getElementById('addExpenseModal').style.display = 'block';
     document.getElementById('addExpenseForm').reset();
     
+    // 清空图片
+    removeImage('add', 'expense');
+    
     // 设置默认日期为今天
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('expenseDate').value = today;
@@ -1449,17 +1483,19 @@ async function addExtraExpense(event) {
 
     // 使用默认标题"消费"
     const title = '消费';
+    const imagePath = document.getElementById('addExpenseImagePath').value;
 
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, amount, expense_date: expenseDate })
+            body: JSON.stringify({ title, amount, expense_date: expenseDate, image_path: imagePath || null })
         });
 
         const result = await response.json();
         if (response.ok) {
             closeModal('addExpenseModal');
+            removeImage('add', 'expense');
             loadExtraExpenses();
         } else {
             console.error('添加失败：', result.error);
@@ -1495,6 +1531,16 @@ async function showEditExpenseModal(expenseId) {
         document.getElementById('editExpenseDate').value = date.toISOString().split('T')[0];
         document.getElementById('editExpenseAmount').value = expense.amount;
         
+        // 加载图片
+        if (expense.image_path) {
+            document.getElementById('editExpenseImagePath').value = expense.image_path;
+            document.getElementById('editExpenseImagePreview').style.display = 'block';
+            document.getElementById('editExpenseImagePreviewImg').src = expense.image_path;
+        } else {
+            document.getElementById('editExpenseImagePath').value = '';
+            document.getElementById('editExpenseImagePreview').style.display = 'none';
+        }
+        
         document.getElementById('editExpenseModal').style.display = 'block';
     } catch (error) {
         console.error('加载消费记录失败:', error);
@@ -1518,12 +1564,13 @@ async function updateExtraExpense(event) {
 
     // 使用默认标题"消费"
     const title = '消费';
+    const imagePath = document.getElementById('editExpenseImagePath').value;
 
     try {
         const response = await fetch(`/api/expenses/${expenseId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, amount, expense_date: expenseDate })
+            body: JSON.stringify({ title, amount, expense_date: expenseDate, image_path: imagePath || null })
         });
 
         const result = await response.json();
@@ -1656,12 +1703,17 @@ function renderMaintenanceRecords(records) {
     let tableRows = '';
     for (let i = 0; i < records.length; i++) {
         const record = records[i];
+        const imageCell = record.image_path 
+            ? `<td><img src="${record.image_path}" alt="记录图片" style="max-width: 80px; max-height: 80px; border-radius: 4px; cursor: pointer;" onclick="showImageModal('${record.image_path}')"></td>`
+            : '<td>--</td>';
+        
         tableRows += `
             <tr>
                 <td>${formatDate(record.maintenance_date)}</td>
                 <td>${record.mileage.toFixed(1)}</td>
                 <td>${escapeHtml(record.description || '--')}</td>
                 <td>¥${record.amount.toFixed(2)}</td>
+                ${imageCell}
                 <td class="action-buttons">
                     <div class="record-menu" onclick="event.stopPropagation()">
                         <button class="menu-btn" onclick="toggleMaintenanceMenu(${record.id})">⋯</button>
@@ -1684,6 +1736,7 @@ function renderMaintenanceRecords(records) {
                     <th>里程数 (km)</th>
                     <th>描述</th>
                     <th>金额 (元)</th>
+                    <th>图片</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -1771,6 +1824,9 @@ function showAddMaintenanceRecordModal(settingId) {
     document.getElementById('addMaintenanceRecordModal').style.display = 'block';
     document.getElementById('addMaintenanceRecordForm').reset();
     
+    // 清空图片
+    removeImage('add', 'maintenanceRecord');
+    
     // 设置默认日期为当前时间
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -1799,6 +1855,8 @@ async function addMaintenanceRecord(event) {
         return;
     }
 
+    const imagePath = document.getElementById('addMaintenanceRecordImagePath').value;
+
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-records`, {
             method: 'POST',
@@ -1807,7 +1865,8 @@ async function addMaintenanceRecord(event) {
                 mileage: mileage,
                 description: description || null,
                 amount: amount,
-                maintenance_date: maintenanceDate
+                maintenance_date: maintenanceDate,
+                image_path: imagePath || null
             })
         });
 
@@ -1815,6 +1874,7 @@ async function addMaintenanceRecord(event) {
         if (response.ok) {
             closeModal('addMaintenanceRecordModal');
             window.currentMaintenanceSettingId = null;
+            removeImage('add', 'maintenanceRecord');
             loadMaintenanceData();
             loadVehicles(); // 刷新车辆信息
         } else {
@@ -1867,6 +1927,16 @@ async function showEditMaintenanceRecordModal(recordId) {
         document.getElementById('editMaintenanceRecordDescription').value = record.description || '';
         document.getElementById('editMaintenanceRecordAmount').value = record.amount;
         
+        // 加载图片
+        if (record.image_path) {
+            document.getElementById('editMaintenanceRecordImagePath').value = record.image_path;
+            document.getElementById('editMaintenanceRecordImagePreview').style.display = 'block';
+            document.getElementById('editMaintenanceRecordImagePreviewImg').src = record.image_path;
+        } else {
+            document.getElementById('editMaintenanceRecordImagePath').value = '';
+            document.getElementById('editMaintenanceRecordImagePreview').style.display = 'none';
+        }
+        
         document.getElementById('editMaintenanceRecordModal').style.display = 'block';
     } catch (error) {
         console.error('加载记录失败:', error);
@@ -1890,6 +1960,8 @@ async function updateMaintenanceRecord(event) {
         return;
     }
 
+    const imagePath = document.getElementById('editMaintenanceRecordImagePath').value;
+
     try {
         const response = await fetch(`/api/maintenance-records/${recordId}`, {
             method: 'PUT',
@@ -1898,7 +1970,8 @@ async function updateMaintenanceRecord(event) {
                 mileage: mileage,
                 description: description || null,
                 amount: amount,
-                maintenance_date: maintenanceDate
+                maintenance_date: maintenanceDate,
+                image_path: imagePath || null
             })
         });
 
@@ -2509,6 +2582,79 @@ async function clearRefuelRecords() {
     } catch (error) {
         console.error('清空记录失败:', error);
     }
+}
+
+// 图片上传处理
+async function handleImageUpload(mode, type, input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // 显示上传中状态
+    const previewId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}ImagePreview`;
+    const previewImgId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}ImagePreviewImg`;
+    const previewDiv = document.getElementById(previewId);
+    const previewImg = document.getElementById(previewImgId);
+    
+    previewDiv.style.display = 'block';
+    previewImg.src = '';
+    previewImg.alt = '上传中...';
+    
+    // 创建FormData
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+        const response = await fetch('/api/upload-image', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            // 保存图片路径
+            const pathInputId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}ImagePath`;
+            document.getElementById(pathInputId).value = result.imageUrl;
+            
+            // 显示预览
+            previewImg.src = result.imageUrl;
+            previewImg.alt = '图片预览';
+        } else {
+            alert('图片上传失败：' + (result.error || '未知错误'));
+            previewDiv.style.display = 'none';
+            input.value = '';
+        }
+    } catch (error) {
+        console.error('图片上传失败:', error);
+        alert('图片上传失败，请重试');
+        previewDiv.style.display = 'none';
+        input.value = '';
+    }
+}
+
+// 删除图片
+function removeImage(mode, type) {
+    const previewId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}ImagePreview`;
+    const pathInputId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}ImagePath`;
+    const fileInputId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}Image`;
+    
+    document.getElementById(previewId).style.display = 'none';
+    document.getElementById(pathInputId).value = '';
+    document.getElementById(fileInputId).value = '';
+}
+
+// 显示图片模态框
+function showImageModal(imageUrl) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; cursor: pointer;';
+    modal.onclick = () => modal.remove();
+    
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    img.style.cssText = 'max-width: 90%; max-height: 90%; object-fit: contain;';
+    img.onclick = (e) => e.stopPropagation();
+    
+    modal.appendChild(img);
+    document.body.appendChild(modal);
 }
 
 // 清空额外消费记录

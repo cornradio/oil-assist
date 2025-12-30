@@ -1,6 +1,9 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+const sharp = require('sharp');
 const db = require('./database');
 
 const app = express();
@@ -10,6 +13,79 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
+
+// 确保uploads目录存在
+const uploadsDir = path.join(__dirname, 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// 配置multer用于文件上传
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 限制10MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('只允许上传图片文件（jpeg, jpg, png, gif, webp）'));
+    }
+  }
+});
+
+// 图片压缩函数
+async function compressImage(buffer, outputPath) {
+  try {
+    await sharp(buffer)
+      .resize(1920, 1920, { 
+        fit: 'inside', 
+        withoutEnlargement: true 
+      })
+      .jpeg({ quality: 80 })
+      .toFile(outputPath);
+    return true;
+  } catch (error) {
+    console.error('图片压缩失败:', error);
+    return false;
+  }
+}
+
+// 图片上传路由
+app.post('/api/upload-image', upload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: '没有上传文件' });
+  }
+
+  try {
+    // 生成唯一文件名
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 15);
+    const filename = `${timestamp}_${randomStr}.jpg`;
+    const outputPath = path.join(uploadsDir, filename);
+
+    // 压缩图片
+    const success = await compressImage(req.file.buffer, outputPath);
+    
+    if (success) {
+      // 返回图片URL
+      const imageUrl = `/uploads/${filename}`;
+      res.json({ imageUrl, message: '图片上传成功' });
+    } else {
+      res.status(500).json({ error: '图片处理失败' });
+    }
+  } catch (error) {
+    console.error('图片上传错误:', error);
+    res.status(500).json({ error: '图片上传失败' });
+  }
+});
+
+// 静态文件服务 - 提供uploads目录的访问
+app.use('/uploads', express.static(uploadsDir));
 
 // API 路由
 
@@ -66,7 +142,7 @@ app.get('/api/vehicles/:id/records', (req, res) => {
 // 添加加油记录
 app.post('/api/vehicles/:id/records', (req, res) => {
   const vehicleId = parseInt(req.params.id);
-  const { liters, price, mileage, refuel_date } = req.body;
+  const { liters, price, mileage, refuel_date, image_path } = req.body;
   // 允许liters和price为0（初始记录），只检查是否为undefined
   if (liters === undefined || price === undefined || mileage === undefined) {
     return res.status(400).json({ error: '升数、价格和里程数为必填项' });
@@ -77,6 +153,7 @@ app.post('/api/vehicles/:id/records', (req, res) => {
     parseFloat(price),
     parseFloat(mileage),
     refuel_date,
+    image_path || null,
     (err, id) => {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -90,7 +167,7 @@ app.post('/api/vehicles/:id/records', (req, res) => {
 // 更新加油记录
 app.put('/api/records/:id', (req, res) => {
   const recordId = parseInt(req.params.id);
-  const { liters, price, mileage, refuel_date } = req.body;
+  const { liters, price, mileage, refuel_date, image_path } = req.body;
   if (!liters || !price || mileage === undefined || !refuel_date) {
     return res.status(400).json({ error: '所有字段为必填项' });
   }
@@ -100,6 +177,7 @@ app.put('/api/records/:id', (req, res) => {
     parseFloat(price),
     parseFloat(mileage),
     refuel_date,
+    image_path || null,
     (err) => {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -184,7 +262,7 @@ app.get('/api/vehicles/:id/expenses', (req, res) => {
 // 添加额外消费记录
 app.post('/api/vehicles/:id/expenses', (req, res) => {
   const vehicleId = parseInt(req.params.id);
-  const { title, amount, expense_date } = req.body;
+  const { title, amount, expense_date, image_path } = req.body;
   if (!title || amount === undefined) {
     return res.status(400).json({ error: '标题和金额为必填项' });
   }
@@ -193,6 +271,7 @@ app.post('/api/vehicles/:id/expenses', (req, res) => {
     title,
     parseFloat(amount),
     expense_date,
+    image_path || null,
     (err, id) => {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -206,7 +285,7 @@ app.post('/api/vehicles/:id/expenses', (req, res) => {
 // 更新额外消费记录
 app.put('/api/expenses/:id', (req, res) => {
   const expenseId = parseInt(req.params.id);
-  const { title, amount, expense_date } = req.body;
+  const { title, amount, expense_date, image_path } = req.body;
   if (!title || amount === undefined || !expense_date) {
     return res.status(400).json({ error: '所有字段为必填项' });
   }
@@ -215,6 +294,7 @@ app.put('/api/expenses/:id', (req, res) => {
     title,
     parseFloat(amount),
     expense_date,
+    image_path || null,
     (err) => {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -304,11 +384,11 @@ app.get('/api/vehicles/:id/maintenance-records', (req, res) => {
 // 添加维保记录
 app.post('/api/vehicles/:id/maintenance-records', (req, res) => {
   const vehicleId = parseInt(req.params.id);
-  const { mileage, description, amount, maintenance_date } = req.body;
+  const { mileage, description, amount, maintenance_date, image_path } = req.body;
   if (!mileage || !amount || amount < 0) {
     return res.status(400).json({ error: '里程数和金额为必填项' });
   }
-  db.addMaintenanceRecord(vehicleId, parseFloat(mileage), description, parseFloat(amount), maintenance_date, (err, id) => {
+  db.addMaintenanceRecord(vehicleId, parseFloat(mileage), description, parseFloat(amount), maintenance_date, image_path || null, (err, id) => {
     if (err) {
       res.status(500).json({ error: err.message });
     } else {
@@ -320,11 +400,11 @@ app.post('/api/vehicles/:id/maintenance-records', (req, res) => {
 // 更新维保记录
 app.put('/api/maintenance-records/:id', (req, res) => {
   const recordId = parseInt(req.params.id);
-  const { mileage, description, amount, maintenance_date } = req.body;
+  const { mileage, description, amount, maintenance_date, image_path } = req.body;
   if (!mileage || !amount || amount < 0 || !maintenance_date) {
     return res.status(400).json({ error: '所有字段为必填项' });
   }
-  db.updateMaintenanceRecord(recordId, parseFloat(mileage), description, parseFloat(amount), maintenance_date, (err) => {
+  db.updateMaintenanceRecord(recordId, parseFloat(mileage), description, parseFloat(amount), maintenance_date, image_path || null, (err) => {
     if (err) {
       res.status(500).json({ error: err.message });
     } else {
