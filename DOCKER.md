@@ -168,6 +168,9 @@ docker push kasusa/oil-assist:latest
 
    
 ## 离线使用 Docker 镜像
+   ```bash
+
 docker save -o oil.tar kasusa/oil-assist:latest
 docker load -i oil.tar
 docker run -d -p 3088:3000 --name oil-assist kasusa/oil-assist:latest
+   ```
