@@ -67,7 +67,8 @@ app.get('/api/vehicles/:id/records', (req, res) => {
 app.post('/api/vehicles/:id/records', (req, res) => {
   const vehicleId = parseInt(req.params.id);
   const { liters, price, mileage, refuel_date } = req.body;
-  if (!liters || !price || mileage === undefined) {
+  // 允许liters和price为0（初始记录），只检查是否为undefined
+  if (liters === undefined || price === undefined || mileage === undefined) {
     return res.status(400).json({ error: '升数、价格和里程数为必填项' });
   }
   db.addRefuelRecord(

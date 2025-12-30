@@ -208,11 +208,14 @@ function renderRecords(records) {
         mileageMap.set(r.id, i);
     });
 
+    // 按里程数从大到小排序显示（最新最大的在上面）
+    const sortedForDisplay = [...records].sort((a, b) => b.mileage - a.mileage);
+
     // 计算每次的油耗（如果有前一条记录）
     let tableRows = '';
-    // records 已经是按日期从新到旧排序的（API返回）
-    for (let i = 0; i < records.length; i++) {
-        const record = records[i];
+    // 按里程数从大到小排序显示
+    for (let i = 0; i < sortedForDisplay.length; i++) {
+        const record = sortedForDisplay[i];
         // 检查是否为初始记录（liters或price为null/0/undefined）
         const isInitialRecord = record.liters === null || record.liters === undefined || record.liters === 0 || 
                                 record.price === null || record.price === undefined || record.price === 0;
@@ -565,26 +568,34 @@ function renderCharts(records, stats) {
         }
     });
 
-    // 按日期排序
-    records.sort((a, b) => new Date(a.refuel_date) - new Date(b.refuel_date));
-
-    // 计算每次的油耗（L/100km）
-    // 横坐标使用所有记录的日期（包括初始记录）
-    const allLabels = records.map(r => formatDate(r.refuel_date, true));
+    // 按里程数从小到大排序，确保油耗计算正确
+    const sortedByMileage = [...records].sort((a, b) => a.mileage - b.mileage);
+    
+    // 为了保持图表横坐标按日期显示，我们需要创建映射
+    // 先按日期排序用于横坐标标签
+    const sortedByDate = [...records].sort((a, b) => new Date(a.refuel_date) - new Date(b.refuel_date));
+    const allLabels = sortedByDate.map(r => formatDate(r.refuel_date, true));
+    
+    // 创建ID到日期索引的映射，用于将按里程计算的油耗映射到按日期排序的位置
+    const dateIndexMap = new Map();
+    sortedByDate.forEach((r, i) => {
+        dateIndexMap.set(r.id, i);
+    });
+    
     const fuelConsumptionData = [];
     const costData = [];
     const priceData = [];
     
-    // 初始化数组，长度与记录数相同
+    // 初始化数组，长度与记录数相同（按日期索引）
     for (let i = 0; i < records.length; i++) {
         fuelConsumptionData.push(null);
         costData.push(null);
         priceData.push(null);
     }
 
-    // 填充所有有效记录的费用和油价（从第0条开始，跳过初始记录）
-    for (let i = 0; i < records.length; i++) {
-        const record = records[i];
+    // 填充所有有效记录的费用和油价（按日期索引）
+    for (let i = 0; i < sortedByDate.length; i++) {
+        const record = sortedByDate[i];
         // 如果有价格，显示费用
         if (record.price !== null && record.price !== undefined && record.price > 0) {
             costData[i] = record.price;
@@ -596,16 +607,20 @@ function renderCharts(records, stats) {
         }
     }
 
-    // 计算油耗（需要前一条记录的里程，从第1条开始）
-    for (let i = 1; i < records.length; i++) {
-        const prevRecord = records[i-1];
-        const currentRecord = records[i];
+    // 计算油耗（需要按里程排序，然后映射到日期索引）
+    for (let i = 1; i < sortedByMileage.length; i++) {
+        const prevRecord = sortedByMileage[i-1];
+        const currentRecord = sortedByMileage[i];
         const distance = currentRecord.mileage - prevRecord.mileage;
         
         // 只有当前记录有加油量且里程增加时，才计算油耗
         if (distance > 0 && currentRecord.liters !== null && currentRecord.liters !== undefined && currentRecord.liters > 0) {
             const consumption = (currentRecord.liters / distance * 100).toFixed(2);
-            fuelConsumptionData[i] = parseFloat(consumption);
+            // 找到当前记录在按日期排序中的索引
+            const dateIndex = dateIndexMap.get(currentRecord.id);
+            if (dateIndex !== undefined) {
+                fuelConsumptionData[dateIndex] = parseFloat(consumption);
+            }
         }
     }
     
@@ -1233,52 +1248,27 @@ async function exportRefuelRecords() {
             return;
         }
 
-        // 按日期排序
-        records.sort((a, b) => new Date(a.refuel_date) - new Date(b.refuel_date));
+        // 按里程数从小到大排序
+        const sortedRecords = [...records].sort((a, b) => a.mileage - b.mileage);
 
-        // 生成CSV内容
-        const headers = ['日期', '里程数(km)', '增加里程数(km)', '加油量(L)', '总价(元)', '单价(元/L)', '油耗(L/100km)'];
+        // 生成CSV内容，只包含三个关键字段
+        const headers = ['里程数(km)', '加油量(L)', '加油价格(元)'];
         const rows = [headers.join(',')];
 
-        // 按里程数排序用于计算
-        const sortedByMileage = [...records].sort((a, b) => a.mileage - b.mileage);
-        const mileageMap = new Map();
-        sortedByMileage.forEach((r, i) => {
-            mileageMap.set(r.id, i);
-        });
-
-        for (let i = 0; i < records.length; i++) {
-            const record = records[i];
-            const isInitialRecord = record.liters === null || record.liters === undefined || record.liters === 0 || 
-                                    record.price === null || record.price === undefined || record.price === 0;
+        for (let i = 0; i < sortedRecords.length; i++) {
+            const record = sortedRecords[i];
             
-            const litersDisplay = isInitialRecord ? '--' : record.liters.toFixed(2);
-            const priceDisplay = isInitialRecord ? '--' : record.price.toFixed(2);
-            const pricePerLiter = isInitialRecord ? '--' : (record.price / record.liters).toFixed(2);
+            // 导出所有记录，包括初始记录
+            // 对于初始记录，加油量和价格导出为0
+            const liters = (record.liters !== null && record.liters !== undefined && record.liters > 0) 
+                ? record.liters : 0;
+            const price = (record.price !== null && record.price !== undefined && record.price > 0) 
+                ? record.price : 0;
             
-            let mileageIncrease = '-';
-            let fuelConsumption = '-';
-            
-            const currentIndex = mileageMap.get(record.id);
-            if (currentIndex !== undefined && currentIndex > 0) {
-                const prevRecord = sortedByMileage[currentIndex - 1];
-                const distance = record.mileage - prevRecord.mileage;
-                if (distance > 0) {
-                    mileageIncrease = distance.toFixed(1);
-                    if (record.liters && record.liters > 0) {
-                        fuelConsumption = (record.liters / distance * 100).toFixed(2);
-                    }
-                }
-            }
-
             const row = [
-                formatDate(record.refuel_date),
                 record.mileage.toFixed(1),
-                mileageIncrease,
-                litersDisplay,
-                priceDisplay,
-                pricePerLiter,
-                fuelConsumption
+                liters.toFixed(2),
+                price.toFixed(2)
             ];
             rows.push(row.join(','));
         }
@@ -1439,31 +1429,31 @@ async function importRefuelRecords(lines) {
 
     for (const line of dataLines) {
         const values = parseCSVLine(line);
-        if (values.length < 2) continue;
+        if (values.length < 3) continue;
 
         try {
-            // 解析数据：日期, 里程数, 增加里程数(忽略), 加油量, 总价, 单价(忽略), 油耗(忽略)
-            const dateStr = values[0].trim();
-            const mileage = parseFloat(values[1]);
-            const liters = values[3] && values[3] !== '--' ? parseFloat(values[3]) : null;
-            const price = values[4] && values[4] !== '--' ? parseFloat(values[4].replace('¥', '')) : null;
+            // 解析数据：只解析三个关键字段 - 里程数(km), 加油量(L), 加油价格(元)
+            const mileage = parseFloat(values[0]);
+            const liters = parseFloat(values[1]);
+            const price = parseFloat(values[2]);
 
-            if (isNaN(mileage)) continue;
+            if (isNaN(mileage) || isNaN(liters) || isNaN(price)) continue;
+            if (mileage <= 0) continue;
+            
+            // 允许导入初始记录（加油量和价格为0的情况）
+            // 对于初始记录，将null值传给API（API会正确处理）
+            const litersValue = (liters > 0) ? liters : 0;
+            const priceValue = (price > 0) ? price : 0;
 
-            // 转换日期格式
-            let refuelDate;
-            if (dateStr.includes('-')) {
-                refuelDate = new Date(dateStr).toISOString();
-            } else {
-                refuelDate = new Date().toISOString();
-            }
+            // 使用当前日期时间作为加油日期
+            const refuelDate = new Date().toISOString();
 
             const response = await fetch(`/api/vehicles/${currentVehicleId}/records`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    liters: liters || 0,
-                    price: price || 0,
+                    liters: litersValue,
+                    price: priceValue,
                     mileage: mileage,
                     refuel_date: refuelDate
                 })

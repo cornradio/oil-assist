@@ -112,9 +112,9 @@ function deleteVehicle(vehicleId, callback) {
 // 添加加油记录
 function addRefuelRecord(vehicleId, liters, price, mileage, refuelDate, callback) {
   const date = refuelDate || new Date().toISOString();
-  // 如果liters或price为空，设置为null
-  const litersValue = (liters === null || liters === undefined || liters === '') ? null : liters;
-  const priceValue = (price === null || price === undefined || price === '') ? null : price;
+  // 如果liters或price为空或0，设置为null（初始记录）
+  const litersValue = (liters === null || liters === undefined || liters === '' || liters === 0) ? null : liters;
+  const priceValue = (price === null || price === undefined || price === '' || price === 0) ? null : price;
   db.run(
     'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date) VALUES (?, ?, ?, ?, ?)',
     [vehicleId, litersValue, priceValue, mileage, date],
@@ -244,7 +244,7 @@ function getVehicleStats(vehicleId, callback) {
             `SELECT mileage, liters 
              FROM refuel_records 
              WHERE vehicle_id = ? 
-             ORDER BY refuel_date ASC`,
+             ORDER BY mileage ASC`,
             [vehicleId],
             (err2, records) => {
               if (err2) {
