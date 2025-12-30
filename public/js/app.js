@@ -1374,7 +1374,6 @@ function renderExpenses(expenses) {
         tableRows += `
             <tr>
                 <td>${formatDate(expense.expense_date)}</td>
-                <td>${escapeHtml(expense.title)}</td>
                 <td>¥${expense.amount.toFixed(2)}</td>
                 <td class="action-buttons">
                     <div class="record-menu" onclick="event.stopPropagation()">
@@ -1394,7 +1393,6 @@ function renderExpenses(expenses) {
             <thead>
                 <tr>
                     <th>日期</th>
-                    <th>消费标题</th>
                     <th>金额 (元)</th>
                     <th>操作</th>
                 </tr>
@@ -1442,13 +1440,15 @@ async function addExtraExpense(event) {
         return;
     }
 
-    const title = document.getElementById('expenseTitle').value.trim();
     const amount = parseFloat(document.getElementById('expenseAmount').value);
     const expenseDate = document.getElementById('expenseDate').value;
 
-    if (!title || isNaN(amount) || !expenseDate) {
+    if (isNaN(amount) || !expenseDate) {
         return;
     }
+
+    // 使用默认标题"消费"
+    const title = '消费';
 
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`, {
@@ -1493,7 +1493,6 @@ async function showEditExpenseModal(expenseId) {
         document.getElementById('editExpenseId').value = expense.id;
         const date = new Date(expense.expense_date);
         document.getElementById('editExpenseDate').value = date.toISOString().split('T')[0];
-        document.getElementById('editExpenseTitle').value = expense.title;
         document.getElementById('editExpenseAmount').value = expense.amount;
         
         document.getElementById('editExpenseModal').style.display = 'block';
@@ -1510,13 +1509,15 @@ async function updateExtraExpense(event) {
     }
 
     const expenseId = parseInt(document.getElementById('editExpenseId').value);
-    const title = document.getElementById('editExpenseTitle').value.trim();
     const amount = parseFloat(document.getElementById('editExpenseAmount').value);
     const expenseDate = document.getElementById('editExpenseDate').value;
 
-    if (!title || isNaN(amount) || !expenseDate) {
+    if (isNaN(amount) || !expenseDate) {
         return;
     }
+
+    // 使用默认标题"消费"
+    const title = '消费';
 
     try {
         const response = await fetch(`/api/expenses/${expenseId}`, {
@@ -1984,7 +1985,27 @@ async function exportRefuelRecords() {
         }
 
         const csvContent = rows.join('\n');
-        exportToCSV(csvContent, `加油记录_${new Date().toISOString().split('T')[0]}.csv`);
+        
+        // 获取当前车辆名称
+        const currentVehicle = vehicles.find(v => v.id === currentVehicleId);
+        const vehicleName = currentVehicle ? currentVehicle.name : '未知车辆';
+        
+        // 清理车辆名称中的特殊字符（Windows文件名不允许的字符）
+        const sanitizedName = vehicleName.replace(/[\/\\:*?"<>|]/g, '_');
+        
+        // 生成时间戳（格式：YYYYMMDD-HHmmss）
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timestamp = `${year}${month}${day}-${hours}${minutes}${seconds}`;
+        
+        // 生成文件名：车辆名字-加油记录-时间.csv
+        const filename = `${sanitizedName}-加油记录-${timestamp}.csv`;
+        exportToCSV(csvContent, filename);
     } catch (error) {
         console.error('导出失败:', error);
     }
@@ -2008,14 +2029,13 @@ async function exportExpenses() {
         expenses.sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date));
 
         // 生成CSV内容
-        const headers = ['日期', '消费标题', '金额(元)'];
+        const headers = ['日期', '金额(元)'];
         const rows = [headers.join(',')];
 
         for (let i = 0; i < expenses.length; i++) {
             const expense = expenses[i];
             const row = [
                 formatDate(expense.expense_date),
-                `"${expense.title.replace(/"/g, '""')}"`,
                 expense.amount.toFixed(2)
             ];
             rows.push(row.join(','));
@@ -2195,14 +2215,19 @@ async function importExpenses(lines) {
 
     for (const line of dataLines) {
         const values = parseCSVLine(line);
-        if (values.length < 3) continue;
+        // 支持2列（日期、金额）或3列（日期、标题、金额）格式
+        if (values.length < 2) continue;
 
         try {
             const dateStr = values[0].trim();
-            const title = values[1].replace(/^"|"$/g, '').trim();
-            const amount = parseFloat(values[2].replace('¥', ''));
+            // 判断是2列还是3列格式
+            let amountIndex = values.length === 2 ? 1 : 2;
+            const amount = parseFloat(values[amountIndex].replace('¥', ''));
 
-            if (!title || isNaN(amount)) continue;
+            if (isNaN(amount)) continue;
+
+            // 使用默认标题"消费"
+            const title = '消费';
 
             // 转换日期格式
             let expenseDate;
