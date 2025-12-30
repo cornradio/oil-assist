@@ -10,7 +10,10 @@
 <body>
     <div class="container">
         <header>
-            <h1>油耗记录系统</h1>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <img src="oil.png" alt="Logo" style="height: 48px; width: auto;">
+                <h1>油耗记录系统</h1>
+            </div>
         </header>
 
         <!-- 车辆管理区域 -->
@@ -27,6 +30,7 @@
             <div class="section-header">
                 <h2>加油记录
                     <span class="header-actions">
+                        <button class="btn-icon" onclick="refreshRefuelRecords()" title="刷新">刷新</button>
                         <button class="btn-icon" onclick="exportRefuelRecords()" title="导出">导出</button>
                         <button class="btn-icon" onclick="showImportModal('refuel')" title="导入">导入</button>
                         <button class="btn-icon btn-icon-danger" onclick="clearRefuelRecords()" title="清空">清空</button>
@@ -143,16 +147,27 @@
                     <input type="datetime-local" id="recordDate" required>
                 </div>
                 <div class="form-group">
-                    <label>加油升数（L）：</label>
-                    <input type="number" id="recordLiters" step="0.01" required placeholder="例如：50.5">
-                </div>
-                <div class="form-group">
-                    <label>价格（元）：</label>
-                    <input type="number" id="recordPrice" step="0.01" required placeholder="例如：350.00">
-                </div>
-                <div class="form-group">
                     <label>加油时里程数（公里）：</label>
                     <input type="number" id="recordMileage" step="0.1" required placeholder="例如：50100">
+                </div>
+                <div class="form-group">
+                    <label>输入方式（二选一）：</label>
+                    <div class="toggle-buttons" style="display: flex; gap: 5px; margin: 10px 0;">
+                        <button type="button" class="toggle-btn toggle-btn-active" id="addRecordModeLiters" onclick="setRecordInputMode('add', 'liters')">加油量(L)</button>
+                        <button type="button" class="toggle-btn" id="addRecordModePricePerLiter" onclick="setRecordInputMode('add', 'pricePerLiter')">单价(元/L)</button>
+                    </div>
+                </div>
+                <div class="form-group" id="addRecordInputGroup">
+                    <label id="addRecordInputLabel">加油升数（L）：</label>
+                    <input type="number" id="recordInputValue" step="0.01" placeholder="例如：50.5">
+                    <input type="hidden" id="recordInputMode" value="liters">
+                </div>
+                <div class="form-group">
+                    <label>总价（元）：</label>
+                    <input type="number" id="recordPrice" step="0.01" required placeholder="例如：350.00" oninput="calculateRecordValues('add')">
+                </div>
+                <div class="form-group" id="addRecordCalculatedValue" style="display: none; color: #666; font-size: 14px; margin-top: -10px;">
+                    <span id="addRecordCalculatedText"></span>
                 </div>
                 <button type="submit" class="btn btn-primary">添加</button>
             </form>
@@ -171,16 +186,27 @@
                     <input type="datetime-local" id="editRecordDate" required>
                 </div>
                 <div class="form-group">
-                    <label>加油升数（L）：</label>
-                    <input type="number" id="editRecordLiters" step="0.01" required placeholder="例如：50.5">
-                </div>
-                <div class="form-group">
-                    <label>价格（元）：</label>
-                    <input type="number" id="editRecordPrice" step="0.01" required placeholder="例如：350.00">
-                </div>
-                <div class="form-group">
                     <label>加油时里程数（公里）：</label>
                     <input type="number" id="editRecordMileage" step="0.1" required placeholder="例如：50100">
+                </div>
+                <div class="form-group">
+                    <label>输入方式（二选一）：</label>
+                    <div class="toggle-buttons" style="display: flex; gap: 5px; margin: 10px 0;">
+                        <button type="button" class="toggle-btn toggle-btn-active" id="editRecordModeLiters" onclick="setRecordInputMode('edit', 'liters')">加油量(L)</button>
+                        <button type="button" class="toggle-btn" id="editRecordModePricePerLiter" onclick="setRecordInputMode('edit', 'pricePerLiter')">单价(元/L)</button>
+                    </div>
+                </div>
+                <div class="form-group" id="editRecordInputGroup">
+                    <label id="editRecordInputLabel">加油升数（L）：</label>
+                    <input type="number" id="editRecordInputValue" step="0.01" placeholder="例如：50.5">
+                    <input type="hidden" id="editRecordInputMode" value="liters">
+                </div>
+                <div class="form-group">
+                    <label>总价（元）：</label>
+                    <input type="number" id="editRecordPrice" step="0.01" required placeholder="例如：350.00" oninput="calculateRecordValues('edit')">
+                </div>
+                <div class="form-group" id="editRecordCalculatedValue" style="display: none; color: #666; font-size: 14px; margin-top: -10px;">
+                    <span id="editRecordCalculatedText"></span>
                 </div>
                 <button type="submit" class="btn btn-primary">保存</button>
             </form>

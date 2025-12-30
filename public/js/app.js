@@ -377,6 +377,23 @@ async function loadVehicleRecords() {
     }
 }
 
+// 刷新加油记录（重新加载并重新计算）
+async function refreshRefuelRecords() {
+    if (!currentVehicleId) return;
+    
+    try {
+        // 重新加载记录（会按里程数排序并重新计算所有数值）
+        await loadVehicleRecords();
+        // 重新加载统计信息
+        await loadVehicleStats();
+        // 重新加载车辆信息（更新里程）
+        await loadVehicles();
+    } catch (error) {
+        console.error('刷新记录失败:', error);
+        alert('刷新失败，请重试');
+    }
+}
+
 // 渲染加油记录列表
 function renderRecords(records) {
     const container = document.getElementById('recordsList');
@@ -411,6 +428,7 @@ function renderRecords(records) {
         const pricePerLiter = isInitialRecord ? '--' : `¥${(record.price / record.liters).toFixed(2)}`;
         let fuelConsumption = '-';
         let mileageIncrease = '-';
+        let costPerKm = '-';
         
         // 找到当前记录在按里程排序后的位置
         const currentIndex = mileageMap.get(record.id);
@@ -421,6 +439,10 @@ function renderRecords(records) {
                 mileageIncrease = distance.toFixed(1);
                 if (record.liters && record.liters > 0) {
                     fuelConsumption = (record.liters / distance * 100).toFixed(2);
+                }
+                // 计算每公里费用：总价 / 增加里程数
+                if (record.price && record.price > 0) {
+                    costPerKm = `¥${(record.price / distance).toFixed(2)}`;
                 }
             }
         }
@@ -434,6 +456,7 @@ function renderRecords(records) {
                 <td>${priceDisplay}</td>
                 <td>${pricePerLiter}</td>
                 <td>${fuelConsumption}</td>
+                <td>${costPerKm}</td>
                 <td class="action-buttons">
                     <div class="record-menu" onclick="event.stopPropagation()">
                         <button class="menu-btn" onclick="toggleRecordMenu(${record.id})">⋯</button>
@@ -458,6 +481,7 @@ function renderRecords(records) {
                     <th>总价 (元)</th>
                     <th>单价 (元/L)</th>
                     <th>油耗 (L/100km)</th>
+                    <th>每公里费用 (元/km)</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -476,6 +500,9 @@ function showAddRecordModal() {
     document.getElementById('addRecordModal').style.display = 'block';
     document.getElementById('addRecordForm').reset();
     
+    // 重置输入模式为加油量
+    setRecordInputMode('add', 'liters');
+    
     // 设置默认日期为当前时间
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -485,6 +512,90 @@ function showAddRecordModal() {
     const currentVehicle = vehicles.find(v => v.id === currentVehicleId);
     if (currentVehicle) {
         document.getElementById('recordMileage').value = currentVehicle.current_mileage;
+    }
+}
+
+// 设置记录输入模式（加油量/单价）
+function setRecordInputMode(mode, inputMode) {
+    // 处理ID命名不一致问题：添加模式的输入框没有'add'前缀，但按钮和标签有
+    const prefix = mode === 'add' ? 'add' : 'edit';
+    const inputPrefix = mode === 'add' ? '' : 'edit';
+    const litersBtn = document.getElementById(`${prefix}RecordModeLiters`);
+    const pricePerLiterBtn = document.getElementById(`${prefix}RecordModePricePerLiter`);
+    const inputLabel = document.getElementById(`${prefix}RecordInputLabel`);
+    const inputValue = document.getElementById(`${inputPrefix}RecordInputValue`);
+    const hiddenMode = document.getElementById(`${inputPrefix}RecordInputMode`);
+    const calculatedValue = document.getElementById(`${prefix}RecordCalculatedValue`);
+    const priceInput = document.getElementById(`${inputPrefix}RecordPrice`);
+    
+    // 更新按钮状态
+    if (inputMode === 'liters') {
+        litersBtn.classList.add('toggle-btn-active');
+        pricePerLiterBtn.classList.remove('toggle-btn-active');
+        inputLabel.textContent = '加油升数（L）：';
+        inputValue.placeholder = '例如：50.5';
+    } else {
+        litersBtn.classList.remove('toggle-btn-active');
+        pricePerLiterBtn.classList.add('toggle-btn-active');
+        inputLabel.textContent = '单价（元/L）：';
+        inputValue.placeholder = '例如：7.50';
+    }
+    
+    // 更新隐藏的mode值
+    hiddenMode.value = inputMode;
+    
+    // 清空输入值
+    inputValue.value = '';
+    
+    // 隐藏计算结果
+    calculatedValue.style.display = 'none';
+    calculatedValue.querySelector('span').textContent = '';
+    
+    // 如果有总价，重新计算
+    if (priceInput && priceInput.value) {
+        calculateRecordValues(mode);
+    }
+}
+
+// 计算记录值（根据输入模式）
+function calculateRecordValues(mode) {
+    // 处理ID命名不一致问题：添加模式的输入框没有'add'前缀，但计算结果div有
+    const prefix = mode === 'add' ? 'add' : 'edit';
+    const inputPrefix = mode === 'add' ? '' : 'edit';
+    const priceInput = document.getElementById(`${inputPrefix}RecordPrice`);
+    const inputValue = document.getElementById(`${inputPrefix}RecordInputValue`);
+    const hiddenMode = document.getElementById(`${inputPrefix}RecordInputMode`);
+    const calculatedValue = document.getElementById(`${prefix}RecordCalculatedValue`);
+    const calculatedText = document.getElementById(`${prefix}RecordCalculatedText`);
+    const inputMode = hiddenMode ? hiddenMode.value : 'liters';
+    
+    const price = parseFloat(priceInput.value);
+    
+    if (isNaN(price) || price <= 0) {
+        calculatedValue.style.display = 'none';
+        return;
+    }
+    
+    if (inputMode === 'liters') {
+        // 输入加油量，计算单价
+        const liters = parseFloat(inputValue.value);
+        if (!isNaN(liters) && liters > 0) {
+            const pricePerLiter = price / liters;
+            calculatedText.textContent = `单价：¥${pricePerLiter.toFixed(2)}/L`;
+            calculatedValue.style.display = 'block';
+        } else {
+            calculatedValue.style.display = 'none';
+        }
+    } else {
+        // 输入单价，计算加油量
+        const pricePerLiter = parseFloat(inputValue.value);
+        if (!isNaN(pricePerLiter) && pricePerLiter > 0) {
+            const liters = price / pricePerLiter;
+            calculatedText.textContent = `加油量：${liters.toFixed(2)}L`;
+            calculatedValue.style.display = 'block';
+        } else {
+            calculatedValue.style.display = 'none';
+        }
     }
 }
 
@@ -512,13 +623,28 @@ async function addRefuelRecord(event) {
         return;
     }
 
-    const liters = parseFloat(document.getElementById('recordLiters').value);
     const price = parseFloat(document.getElementById('recordPrice').value);
     const mileage = parseFloat(document.getElementById('recordMileage').value);
     const refuelDate = document.getElementById('recordDate').value;
+    const inputValue = parseFloat(document.getElementById('recordInputValue').value);
+    const inputMode = document.getElementById('recordInputMode').value || 'liters';
 
-    if (isNaN(liters) || isNaN(price) || isNaN(mileage) || !refuelDate) {
+    if (isNaN(price) || isNaN(mileage) || !refuelDate) {
         return;
+    }
+
+    if (isNaN(inputValue) || inputValue <= 0) {
+        alert(inputMode === 'liters' ? '请输入有效的加油量' : '请输入有效的单价');
+        return;
+    }
+
+    let liters;
+    if (inputMode === 'liters') {
+        // 输入的是加油量
+        liters = inputValue;
+    } else {
+        // 输入的是单价，需要计算加油量
+        liters = price / inputValue;
     }
 
     try {
@@ -563,12 +689,15 @@ async function showEditRecordModal(recordId) {
             return;
         }
 
+        // 重置输入模式为加油量模式
+        setRecordInputMode('edit', 'liters');
+
         // 填充表单
         document.getElementById('editRecordId').value = record.id;
         const date = new Date(record.refuel_date);
         date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
         document.getElementById('editRecordDate').value = date.toISOString().slice(0, 16);
-        document.getElementById('editRecordLiters').value = record.liters || '';
+        document.getElementById('editRecordInputValue').value = record.liters || '';
         document.getElementById('editRecordPrice').value = record.price || '';
         document.getElementById('editRecordMileage').value = record.mileage;
         
@@ -586,13 +715,28 @@ async function updateRefuelRecord(event) {
     }
 
     const recordId = parseInt(document.getElementById('editRecordId').value);
-    const liters = parseFloat(document.getElementById('editRecordLiters').value);
     const price = parseFloat(document.getElementById('editRecordPrice').value);
     const mileage = parseFloat(document.getElementById('editRecordMileage').value);
     const refuelDate = document.getElementById('editRecordDate').value;
+    const inputValue = parseFloat(document.getElementById('editRecordInputValue').value);
+    const inputMode = document.getElementById('editRecordInputMode').value || 'liters';
 
-    if (isNaN(liters) || isNaN(price) || isNaN(mileage) || !refuelDate) {
+    if (isNaN(price) || isNaN(mileage) || !refuelDate) {
         return;
+    }
+
+    if (isNaN(inputValue) || inputValue <= 0) {
+        alert(inputMode === 'liters' ? '请输入有效的加油量' : '请输入有效的单价');
+        return;
+    }
+
+    let liters;
+    if (inputMode === 'liters') {
+        // 输入的是加油量
+        liters = inputValue;
+    } else {
+        // 输入的是单价，需要计算加油量
+        liters = price / inputValue;
     }
 
     try {
