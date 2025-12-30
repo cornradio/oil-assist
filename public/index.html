@@ -56,6 +56,22 @@
             </div>
         </section>
 
+        <!-- 定期维保区域 -->
+        <section class="section" id="maintenanceSection" style="display: none;">
+            <div class="section-header">
+                <h2>定期维保
+                    <span class="header-actions">
+                        <button class="btn-icon" onclick="showAddMaintenanceSettingModal()" title="添加维保设置">+ 设置</button>
+                    </span>
+                </h2>
+            </div>
+            <div class="card">
+                <div id="maintenanceAlerts"></div>
+                <div id="maintenanceSettings" style="margin-top: 20px;"></div>
+                <div id="maintenanceRecords" style="margin-top: 20px;"></div>
+            </div>
+        </section>
+
         <!-- 统计图表区域 -->
         <section class="section" id="statsSection" style="display: none;">
             <div class="section-header">
@@ -108,7 +124,10 @@
                     <label>当前里程数（公里）：</label>
                     <input type="number" id="vehicleMileage" step="0.1" required placeholder="例如：50000">
                 </div>
-                <button type="submit" class="btn btn-primary">添加</button>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">添加</button>
+                    <button type="button" class="btn btn-secondary" onclick="showImportForNewVehicle()">导入数据</button>
+                </div>
             </form>
         </div>
     </div>
@@ -215,6 +234,80 @@
         </div>
     </div>
 
+    <!-- 添加维保设置模态框 -->
+    <div id="addMaintenanceSettingModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addMaintenanceSettingModal')">&times;</span>
+            <h3>添加维保设置</h3>
+            <form id="addMaintenanceSettingForm" onsubmit="addMaintenanceSetting(event)">
+                <div class="form-group">
+                    <label>维保间隔（公里）：</label>
+                    <input type="number" id="maintenanceIntervalKm" step="1" required placeholder="例如：2000、5000">
+                </div>
+                <div class="form-group">
+                    <label>描述（可选）：</label>
+                    <input type="text" id="maintenanceSettingDescription" placeholder="例如：摩托车换机油、汽车换机油">
+                </div>
+                <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 添加维保记录模态框 -->
+    <div id="addMaintenanceRecordModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('addMaintenanceRecordModal')">&times;</span>
+            <h3>添加维保记录</h3>
+            <form id="addMaintenanceRecordForm" onsubmit="addMaintenanceRecord(event)">
+                <div class="form-group">
+                    <label>维保日期时间：</label>
+                    <input type="datetime-local" id="maintenanceRecordDate" required>
+                </div>
+                <div class="form-group">
+                    <label>维保时里程数（公里）：</label>
+                    <input type="number" id="maintenanceRecordMileage" step="0.1" required placeholder="例如：50100">
+                </div>
+                <div class="form-group">
+                    <label>维保描述（可选）：</label>
+                    <input type="text" id="maintenanceRecordDescription" placeholder="例如：换机油、保养等">
+                </div>
+                <div class="form-group">
+                    <label>花费金额（元）：</label>
+                    <input type="number" id="maintenanceRecordAmount" step="0.01" required placeholder="例如：200.00">
+                </div>
+                <button type="submit" class="btn btn-primary">添加</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 编辑维保记录模态框 -->
+    <div id="editMaintenanceRecordModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('editMaintenanceRecordModal')">&times;</span>
+            <h3>编辑维保记录</h3>
+            <form id="editMaintenanceRecordForm" onsubmit="updateMaintenanceRecord(event)">
+                <input type="hidden" id="editMaintenanceRecordId">
+                <div class="form-group">
+                    <label>维保日期时间：</label>
+                    <input type="datetime-local" id="editMaintenanceRecordDate" required>
+                </div>
+                <div class="form-group">
+                    <label>维保时里程数（公里）：</label>
+                    <input type="number" id="editMaintenanceRecordMileage" step="0.1" required placeholder="例如：50100">
+                </div>
+                <div class="form-group">
+                    <label>维保描述（可选）：</label>
+                    <input type="text" id="editMaintenanceRecordDescription" placeholder="例如：换机油、保养等">
+                </div>
+                <div class="form-group">
+                    <label>花费金额（元）：</label>
+                    <input type="number" id="editMaintenanceRecordAmount" step="0.01" required placeholder="例如：200.00">
+                </div>
+                <button type="submit" class="btn btn-primary">保存</button>
+            </form>
+        </div>
+    </div>
+
     <!-- 导入数据模态框 -->
     <div id="importModal" class="modal">
         <div class="modal-content">
@@ -239,6 +332,38 @@
             <div id="importPreview" style="margin-top: 15px; display: none;">
                 <h4>预览（前5行）：</h4>
                 <pre id="importPreviewContent" style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 200px; overflow: auto;"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建车辆并导入数据模态框 -->
+    <div id="importForNewVehicleModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('importForNewVehicleModal')">&times;</span>
+            <h3>新建车辆并导入数据</h3>
+            <div class="form-group">
+                <label>车辆名称：</label>
+                <input type="text" id="newVehicleNameForImport" required placeholder="例如：我的车">
+            </div>
+            <div class="form-group">
+                <label>选择导入方式：</label>
+                <div style="margin: 15px 0;">
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('importFileInputForNewVehicle').click()" style="margin-right: 10px;">选择文件</button>
+                    <button type="button" class="btn btn-primary" onclick="pasteFromClipboardForNewVehicle()">从剪切板粘贴</button>
+                </div>
+                <input type="file" id="importFileInputForNewVehicle" accept=".csv,.txt" style="display: none;" onchange="handleFileImportForNewVehicle(event)">
+            </div>
+            <div class="form-group">
+                <label>或直接粘贴CSV数据：</label>
+                <textarea id="importDataTextForNewVehicle" rows="10" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;" placeholder="粘贴CSV格式数据，第一行为表头。格式：里程数(km), 加油量(L), 加油价格(元)"></textarea>
+            </div>
+            <div style="margin-top: 15px;">
+                <button type="button" class="btn btn-primary" onclick="processImportForNewVehicle()">创建车辆并导入</button>
+                <button type="button" class="btn" onclick="closeModal('importForNewVehicleModal')" style="margin-left: 10px;">取消</button>
+            </div>
+            <div id="importPreviewForNewVehicle" style="margin-top: 15px; display: none;">
+                <h4>预览（前5行）：</h4>
+                <pre id="importPreviewContentForNewVehicle" style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 200px; overflow: auto;"></pre>
             </div>
         </div>
     </div>

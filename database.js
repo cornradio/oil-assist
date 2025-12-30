@@ -55,6 +55,35 @@ function initDatabase() {
       console.error('创建额外消费表错误:', err.message);
     }
   });
+
+  // 维保设置表
+  db.run(`CREATE TABLE IF NOT EXISTS maintenance_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vehicle_id INTEGER NOT NULL,
+    interval_km REAL NOT NULL,
+    description TEXT,
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
+    UNIQUE(vehicle_id, interval_km)
+  )`, (err) => {
+    if (err) {
+      console.error('创建维保设置表错误:', err.message);
+    }
+  });
+
+  // 维保记录表
+  db.run(`CREATE TABLE IF NOT EXISTS maintenance_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vehicle_id INTEGER NOT NULL,
+    maintenance_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    mileage REAL NOT NULL,
+    description TEXT,
+    amount REAL NOT NULL,
+    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
+  )`, (err) => {
+    if (err) {
+      console.error('创建维保记录表错误:', err.message);
+    }
+  });
 }
 
 // 获取所有车辆
@@ -363,6 +392,77 @@ function clearExtraExpenses(vehicleId, callback) {
   db.run('DELETE FROM extra_expenses WHERE vehicle_id = ?', [vehicleId], callback);
 }
 
+// 获取车辆的维保设置
+function getMaintenanceSettings(vehicleId, callback) {
+  db.all(
+    'SELECT * FROM maintenance_settings WHERE vehicle_id = ? ORDER BY interval_km ASC',
+    [vehicleId],
+    callback
+  );
+}
+
+// 添加维保设置
+function addMaintenanceSetting(vehicleId, intervalKm, description, callback) {
+  db.run(
+    'INSERT OR REPLACE INTO maintenance_settings (vehicle_id, interval_km, description) VALUES (?, ?, ?)',
+    [vehicleId, intervalKm, description || null],
+    function(err) {
+      callback(err, this.lastID);
+    }
+  );
+}
+
+// 删除维保设置
+function deleteMaintenanceSetting(settingId, callback) {
+  db.run('DELETE FROM maintenance_settings WHERE id = ?', [settingId], callback);
+}
+
+// 获取车辆的维保记录
+function getMaintenanceRecords(vehicleId, callback) {
+  db.all(
+    'SELECT * FROM maintenance_records WHERE vehicle_id = ? ORDER BY maintenance_date DESC',
+    [vehicleId],
+    callback
+  );
+}
+
+// 获取最后一次维保记录（按里程数）
+function getLastMaintenanceRecord(vehicleId, intervalKm, callback) {
+  db.get(
+    `SELECT * FROM maintenance_records 
+     WHERE vehicle_id = ? AND mileage <= (SELECT MAX(mileage) FROM maintenance_records WHERE vehicle_id = ?)
+     ORDER BY mileage DESC LIMIT 1`,
+    [vehicleId, vehicleId],
+    callback
+  );
+}
+
+// 添加维保记录
+function addMaintenanceRecord(vehicleId, mileage, description, amount, maintenanceDate, callback) {
+  const date = maintenanceDate || new Date().toISOString();
+  db.run(
+    'INSERT INTO maintenance_records (vehicle_id, mileage, description, amount, maintenance_date) VALUES (?, ?, ?, ?, ?)',
+    [vehicleId, mileage, description || null, amount, date],
+    function(err) {
+      callback(err, this.lastID);
+    }
+  );
+}
+
+// 更新维保记录
+function updateMaintenanceRecord(recordId, mileage, description, amount, maintenanceDate, callback) {
+  db.run(
+    'UPDATE maintenance_records SET mileage = ?, description = ?, amount = ?, maintenance_date = ? WHERE id = ?',
+    [mileage, description, amount, maintenanceDate, recordId],
+    callback
+  );
+}
+
+// 删除维保记录
+function deleteMaintenanceRecord(recordId, callback) {
+  db.run('DELETE FROM maintenance_records WHERE id = ?', [recordId], callback);
+}
+
 module.exports = {
   db,
   getAllVehicles,
@@ -381,7 +481,15 @@ module.exports = {
   deleteExtraExpense,
   getExtraExpenseStats,
   clearRefuelRecords,
-  clearExtraExpenses
+  clearExtraExpenses,
+  getMaintenanceSettings,
+  addMaintenanceSetting,
+  deleteMaintenanceSetting,
+  getMaintenanceRecords,
+  getLastMaintenanceRecord,
+  addMaintenanceRecord,
+  updateMaintenanceRecord,
+  deleteMaintenanceRecord
 };
 
 

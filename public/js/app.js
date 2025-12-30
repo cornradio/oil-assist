@@ -76,6 +76,7 @@ function selectVehicle(vehicleId) {
     renderVehicles();
     document.getElementById('refuelSection').style.display = 'block';
     document.getElementById('expenseSection').style.display = 'block';
+    document.getElementById('maintenanceSection').style.display = 'block';
     document.getElementById('statsSection').style.display = 'block';
     
     // 销毁所有现有图表
@@ -88,6 +89,7 @@ function selectVehicle(vehicleId) {
     
     loadVehicleRecords();
     loadExtraExpenses();
+    loadMaintenanceData();
     loadVehicleStats();
     
     // 关闭所有菜单
@@ -113,12 +115,196 @@ function refreshStats() {
     loadVehicleStats();
     loadVehicleRecords();
     loadExtraExpenses();
+    loadMaintenanceData();
 }
 
 // 显示添加车辆模态框
 function showAddVehicleModal() {
     document.getElementById('addVehicleModal').style.display = 'block';
     document.getElementById('addVehicleForm').reset();
+}
+
+// 显示新建车辆并导入数据模态框
+function showImportForNewVehicle() {
+    closeModal('addVehicleModal');
+    document.getElementById('importForNewVehicleModal').style.display = 'block';
+    document.getElementById('newVehicleNameForImport').value = '';
+    document.getElementById('importDataTextForNewVehicle').value = '';
+    document.getElementById('importPreviewForNewVehicle').style.display = 'none';
+}
+
+// 从剪切板粘贴（新建车辆）
+async function pasteFromClipboardForNewVehicle() {
+    try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('importDataTextForNewVehicle').value = text;
+        previewImportDataForNewVehicle(text);
+    } catch (error) {
+        console.error('读取剪切板失败:', error);
+        alert('无法读取剪切板，请手动粘贴数据');
+    }
+}
+
+// 处理文件导入（新建车辆）
+function handleFileImportForNewVehicle(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const content = e.target.result;
+        document.getElementById('importDataTextForNewVehicle').value = content;
+        previewImportDataForNewVehicle(content);
+    };
+    reader.readAsText(file);
+}
+
+// 预览导入数据（新建车辆）
+function previewImportDataForNewVehicle(text) {
+    const lines = text.trim().split('\n').slice(0, 6);
+    document.getElementById('importPreviewContentForNewVehicle').textContent = lines.join('\n');
+    document.getElementById('importPreviewForNewVehicle').style.display = 'block';
+}
+
+// 处理新建车辆并导入数据
+async function processImportForNewVehicle() {
+    const vehicleName = document.getElementById('newVehicleNameForImport').value.trim();
+    if (!vehicleName) {
+        alert('请输入车辆名称');
+        return;
+    }
+
+    const text = document.getElementById('importDataTextForNewVehicle').value.trim();
+    if (!text) {
+        alert('请输入或导入CSV数据');
+        return;
+    }
+
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length < 2) {
+        alert('数据不足，至少需要表头和一条数据');
+        return;
+    }
+
+    try {
+        // 解析CSV数据
+        const dataLines = lines.slice(1); // 跳过表头
+        const records = [];
+        let minMileage = Infinity;
+
+        for (const line of dataLines) {
+            const values = parseCSVLine(line);
+            if (values.length < 3) continue;
+
+            const mileage = parseFloat(values[0]);
+            const liters = parseFloat(values[1]);
+            const price = parseFloat(values[2]);
+
+            if (isNaN(mileage) || mileage <= 0) continue;
+            if (isNaN(liters) || isNaN(price)) continue;
+
+            // 允许初始记录（加油量和价格为0）
+            const litersValue = (liters > 0) ? liters : 0;
+            const priceValue = (price > 0) ? price : 0;
+
+            // 找到最小里程数作为初始里程
+            if (mileage < minMileage) {
+                minMileage = mileage;
+            }
+
+            records.push({ mileage, liters: litersValue, price: priceValue });
+        }
+
+        if (records.length === 0) {
+            alert('没有有效的记录数据');
+            return;
+        }
+
+        if (minMileage === Infinity) {
+            alert('无法确定初始里程数');
+            return;
+        }
+
+        // 创建车辆
+        const vehicleResponse = await fetch('/api/vehicles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                name: vehicleName, 
+                current_mileage: minMileage 
+            })
+        });
+
+        const vehicleResult = await vehicleResponse.json();
+        if (!vehicleResponse.ok) {
+            alert('创建车辆失败：' + (vehicleResult.error || '未知错误'));
+            return;
+        }
+
+        const vehicleId = vehicleResult.id;
+
+        // 删除自动创建的初始记录（因为我们要导入自己的数据）
+        // 先获取初始记录ID
+        const recordsResponse = await fetch(`/api/vehicles/${vehicleId}/records`);
+        const existingRecords = await recordsResponse.json();
+        if (existingRecords.length > 0) {
+            // 删除初始记录（查找liters和price都为null或0的记录）
+            const initialRecord = existingRecords.find(r => 
+                (r.liters === null || r.liters === 0 || r.liters === undefined) && 
+                (r.price === null || r.price === 0 || r.price === undefined)
+            );
+            if (initialRecord) {
+                await fetch(`/api/records/${initialRecord.id}`, {
+                    method: 'DELETE'
+                });
+            }
+        }
+
+        // 按里程数从小到大排序记录（确保初始记录先导入）
+        records.sort((a, b) => a.mileage - b.mileage);
+
+        // 导入所有记录
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const record of records) {
+            try {
+                const response = await fetch(`/api/vehicles/${vehicleId}/records`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        liters: record.liters,
+                        price: record.price,
+                        mileage: record.mileage,
+                        refuel_date: new Date().toISOString()
+                    })
+                });
+
+                if (response.ok) {
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            } catch (error) {
+                failCount++;
+            }
+        }
+
+        closeModal('importForNewVehicleModal');
+        
+        // 刷新数据并选择新创建的车辆
+        await loadVehicles();
+        selectVehicle(vehicleId);
+        
+        if (failCount > 0) {
+            alert(`导入完成：成功 ${successCount} 条，失败 ${failCount} 条`);
+        } else {
+            alert(`导入成功：共 ${successCount} 条记录`);
+        }
+    } catch (error) {
+        console.error('导入失败:', error);
+        alert('导入失败：' + error.message);
+    }
 }
 
 // 添加车辆
@@ -1228,6 +1414,383 @@ async function deleteExpense(expenseId) {
         }
     } catch (error) {
         console.error('删除消费记录失败:', error);
+    }
+}
+
+// 加载维保数据
+async function loadMaintenanceData() {
+    if (!currentVehicleId) return;
+
+    try {
+        // 加载维保提醒
+        const alertsResponse = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-alerts`);
+        const alerts = await alertsResponse.json();
+        
+        // 加载维保设置
+        const settingsResponse = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-settings`);
+        const settings = await settingsResponse.json();
+        
+        // 加载维保记录
+        const recordsResponse = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-records`);
+        const records = await recordsResponse.json();
+        
+        renderMaintenanceAlerts(alerts);
+        renderMaintenanceSettings(settings);
+        renderMaintenanceRecords(records);
+    } catch (error) {
+        console.error('加载维保数据失败:', error);
+    }
+}
+
+// 渲染维保提醒
+function renderMaintenanceAlerts(alerts) {
+    const container = document.getElementById('maintenanceAlerts');
+    
+    if (alerts.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    let alertsHTML = '';
+    for (const alert of alerts) {
+        alertsHTML += `
+            <div class="maintenance-alert" style="background-color: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong style="color: #856404; font-size: 16px;">⚠️ 维保提醒</strong>
+                    <p style="margin: 8px 0 0 0; color: #856404;">
+                        已经达到 ${alert.interval_km.toFixed(0)}km 维保间隔，需要进行维保${alert.description ? '：' + escapeHtml(alert.description) : ''}
+                        ${alert.overdue_km > 0 ? `（已超过 ${alert.overdue_km.toFixed(0)}km）` : ''}
+                    </p>
+                    <p style="margin: 5px 0 0 0; color: #856404; font-size: 12px;">
+                        当前里程：${alert.current_mileage.toFixed(0)}km | 上次维保：${alert.last_maintenance_mileage > 0 ? alert.last_maintenance_mileage.toFixed(0) + 'km' : '无'} | 下次维保：${alert.next_maintenance_mileage.toFixed(0)}km
+                    </p>
+                </div>
+                <button class="btn btn-primary" onclick="showAddMaintenanceRecordModal(${alert.setting_id})">添加记录</button>
+            </div>
+        `;
+    }
+    
+    container.innerHTML = alertsHTML;
+}
+
+// 渲染维保设置
+function renderMaintenanceSettings(settings) {
+    const container = document.getElementById('maintenanceSettings');
+    
+    if (settings.length === 0) {
+        container.innerHTML = '<p style="color: #666; padding: 10px;">暂无维保设置，请点击右上角"设置"按钮添加</p>';
+        return;
+    }
+    
+    let settingsHTML = '<h3 style="margin-bottom: 15px;">维保设置</h3><div style="display: flex; flex-wrap: wrap; gap: 10px;">';
+    for (const setting of settings) {
+        settingsHTML += `
+            <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px 15px; display: flex; align-items: center; gap: 10px;">
+                <span><strong>${setting.interval_km.toFixed(0)}km</strong> ${setting.description ? ' - ' + escapeHtml(setting.description) : ''}</span>
+                <button class="btn-icon" onclick="deleteMaintenanceSetting(${setting.id})" title="删除">×</button>
+            </div>
+        `;
+    }
+    settingsHTML += '</div>';
+    
+    container.innerHTML = settingsHTML;
+}
+
+// 渲染维保记录
+function renderMaintenanceRecords(records) {
+    const container = document.getElementById('maintenanceRecords');
+    
+    if (records.length === 0) {
+        container.innerHTML = '<h3 style="margin-bottom: 15px;">维保记录</h3><p style="color: #666; padding: 10px;">暂无维保记录</p>';
+        return;
+    }
+    
+    let tableRows = '';
+    for (let i = 0; i < records.length; i++) {
+        const record = records[i];
+        tableRows += `
+            <tr>
+                <td>${formatDate(record.maintenance_date)}</td>
+                <td>${record.mileage.toFixed(1)}</td>
+                <td>${escapeHtml(record.description || '--')}</td>
+                <td>¥${record.amount.toFixed(2)}</td>
+                <td class="action-buttons">
+                    <div class="record-menu" onclick="event.stopPropagation()">
+                        <button class="menu-btn" onclick="toggleMaintenanceMenu(${record.id})">⋯</button>
+                        <div class="menu-dropdown" id="maintenance-menu-${record.id}" style="display: none;">
+                            <button class="menu-item" onclick="showEditMaintenanceRecordModal(${record.id})">编辑</button>
+                            <button class="menu-item menu-item-danger" onclick="deleteMaintenanceRecord(${record.id})">删除</button>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+    
+    container.innerHTML = `
+        <h3 style="margin-bottom: 15px;">维保记录</h3>
+        <table class="records-table">
+            <thead>
+                <tr>
+                    <th>日期</th>
+                    <th>里程数 (km)</th>
+                    <th>描述</th>
+                    <th>金额 (元)</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRows}
+            </tbody>
+        </table>
+    `;
+}
+
+// 显示添加维保设置模态框
+function showAddMaintenanceSettingModal() {
+    if (!currentVehicleId) {
+        return;
+    }
+    document.getElementById('addMaintenanceSettingModal').style.display = 'block';
+    document.getElementById('addMaintenanceSettingForm').reset();
+}
+
+// 添加维保设置
+async function addMaintenanceSetting(event) {
+    event.preventDefault();
+    if (!currentVehicleId) {
+        return;
+    }
+
+    const intervalKm = parseFloat(document.getElementById('maintenanceIntervalKm').value);
+    const description = document.getElementById('maintenanceSettingDescription').value.trim();
+
+    if (isNaN(intervalKm) || intervalKm <= 0) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ interval_km: intervalKm, description: description || null })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            closeModal('addMaintenanceSettingModal');
+            loadMaintenanceData();
+        } else {
+            console.error('添加失败：', result.error);
+            alert('添加失败：' + (result.error || '未知错误'));
+        }
+    } catch (error) {
+        console.error('添加维保设置失败:', error);
+    }
+}
+
+// 删除维保设置
+async function deleteMaintenanceSetting(settingId) {
+    if (!confirm('确定要删除这个维保设置吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/maintenance-settings/${settingId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            loadMaintenanceData();
+        } else {
+            console.error('删除失败：', result.error);
+        }
+    } catch (error) {
+        console.error('删除维保设置失败:', error);
+    }
+}
+
+// 显示添加维保记录模态框
+function showAddMaintenanceRecordModal(settingId) {
+    if (!currentVehicleId) {
+        return;
+    }
+    
+    // 如果从提醒中点击，保存settingId
+    window.currentMaintenanceSettingId = settingId || null;
+    
+    document.getElementById('addMaintenanceRecordModal').style.display = 'block';
+    document.getElementById('addMaintenanceRecordForm').reset();
+    
+    // 设置默认日期为当前时间
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById('maintenanceRecordDate').value = now.toISOString().slice(0, 16);
+    
+    // 自动填充当前里程数
+    const currentVehicle = vehicles.find(v => v.id === currentVehicleId);
+    if (currentVehicle) {
+        document.getElementById('maintenanceRecordMileage').value = currentVehicle.current_mileage;
+    }
+}
+
+// 添加维保记录
+async function addMaintenanceRecord(event) {
+    event.preventDefault();
+    if (!currentVehicleId) {
+        return;
+    }
+
+    const mileage = parseFloat(document.getElementById('maintenanceRecordMileage').value);
+    const description = document.getElementById('maintenanceRecordDescription').value.trim();
+    const amount = parseFloat(document.getElementById('maintenanceRecordAmount').value);
+    const maintenanceDate = document.getElementById('maintenanceRecordDate').value;
+
+    if (isNaN(mileage) || isNaN(amount) || !maintenanceDate) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-records`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mileage: mileage,
+                description: description || null,
+                amount: amount,
+                maintenance_date: maintenanceDate
+            })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            closeModal('addMaintenanceRecordModal');
+            window.currentMaintenanceSettingId = null;
+            loadMaintenanceData();
+            loadVehicles(); // 刷新车辆信息
+        } else {
+            console.error('添加失败：', result.error);
+            alert('添加失败：' + (result.error || '未知错误'));
+        }
+    } catch (error) {
+        console.error('添加维保记录失败:', error);
+    }
+}
+
+// 切换维保记录菜单
+function toggleMaintenanceMenu(recordId) {
+    document.querySelectorAll('.menu-dropdown').forEach(menu => {
+        if (menu.id !== `maintenance-menu-${recordId}`) {
+            menu.style.display = 'none';
+        }
+    });
+    
+    const menu = document.getElementById(`maintenance-menu-${recordId}`);
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+// 显示编辑维保记录模态框
+async function showEditMaintenanceRecordModal(recordId) {
+    if (!currentVehicleId) {
+        return;
+    }
+
+    document.querySelectorAll('.menu-dropdown').forEach(menu => {
+        menu.style.display = 'none';
+    });
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-records`);
+        const records = await response.json();
+        const record = records.find(r => r.id === recordId);
+        
+        if (!record) {
+            return;
+        }
+
+        document.getElementById('editMaintenanceRecordId').value = record.id;
+        const date = new Date(record.maintenance_date);
+        date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+        document.getElementById('editMaintenanceRecordDate').value = date.toISOString().slice(0, 16);
+        document.getElementById('editMaintenanceRecordMileage').value = record.mileage;
+        document.getElementById('editMaintenanceRecordDescription').value = record.description || '';
+        document.getElementById('editMaintenanceRecordAmount').value = record.amount;
+        
+        document.getElementById('editMaintenanceRecordModal').style.display = 'block';
+    } catch (error) {
+        console.error('加载记录失败:', error);
+    }
+}
+
+// 更新维保记录
+async function updateMaintenanceRecord(event) {
+    event.preventDefault();
+    if (!currentVehicleId) {
+        return;
+    }
+
+    const recordId = parseInt(document.getElementById('editMaintenanceRecordId').value);
+    const mileage = parseFloat(document.getElementById('editMaintenanceRecordMileage').value);
+    const description = document.getElementById('editMaintenanceRecordDescription').value.trim();
+    const amount = parseFloat(document.getElementById('editMaintenanceRecordAmount').value);
+    const maintenanceDate = document.getElementById('editMaintenanceRecordDate').value;
+
+    if (isNaN(mileage) || isNaN(amount) || !maintenanceDate) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/maintenance-records/${recordId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mileage: mileage,
+                description: description || null,
+                amount: amount,
+                maintenance_date: maintenanceDate
+            })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            closeModal('editMaintenanceRecordModal');
+            loadMaintenanceData();
+            loadVehicles();
+        } else {
+            console.error('更新失败：', result.error);
+        }
+    } catch (error) {
+        console.error('更新维保记录失败:', error);
+    }
+}
+
+// 删除维保记录
+async function deleteMaintenanceRecord(recordId) {
+    document.querySelectorAll('.menu-dropdown').forEach(menu => {
+        menu.style.display = 'none';
+    });
+
+    if (!confirm('确定要删除这条维保记录吗？')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/maintenance-records/${recordId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            loadMaintenanceData();
+            loadVehicles();
+        } else {
+            console.error('删除失败：', result.error);
+        }
+    } catch (error) {
+        console.error('删除维保记录失败:', error);
     }
 }
 
