@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
+
 <body>
     <div class="container">
         <header>
@@ -91,7 +93,8 @@
                     <div class="chart-wrapper">
                         <div class="chart-header">
                             <span>油耗趋势</span>
-                            <button class="chart-expand-btn" onclick="expandChart('fuelConsumptionChart')" title="全屏查看">⛶</button>
+                            <button class="chart-expand-btn" onclick="expandChart('fuelConsumptionChart')"
+                                title="全屏查看">⛶</button>
                         </div>
                         <canvas id="fuelConsumptionChart"></canvas>
                     </div>
@@ -153,8 +156,10 @@
                 <div class="form-group">
                     <label>输入方式（二选一）：</label>
                     <div class="toggle-buttons" style="display: flex; gap: 5px; margin: 10px 0;">
-                        <button type="button" class="toggle-btn toggle-btn-active" id="addRecordModeLiters" onclick="setRecordInputMode('add', 'liters')">加油量(L)</button>
-                        <button type="button" class="toggle-btn" id="addRecordModePricePerLiter" onclick="setRecordInputMode('add', 'pricePerLiter')">单价(元/L)</button>
+                        <button type="button" class="toggle-btn toggle-btn-active" id="addRecordModeLiters"
+                            onclick="setRecordInputMode('add', 'liters')">加油量(L)</button>
+                        <button type="button" class="toggle-btn" id="addRecordModePricePerLiter"
+                            onclick="setRecordInputMode('add', 'pricePerLiter')">单价(元/L)</button>
                     </div>
                 </div>
                 <div class="form-group" id="addRecordInputGroup">
@@ -164,18 +169,23 @@
                 </div>
                 <div class="form-group">
                     <label>总价（元）：</label>
-                    <input type="number" id="recordPrice" step="0.01" required placeholder="例如：350.00" oninput="calculateRecordValues('add')">
+                    <input type="number" id="recordPrice" step="0.01" required placeholder="例如：350.00"
+                        oninput="calculateRecordValues('add')">
                 </div>
-                <div class="form-group" id="addRecordCalculatedValue" style="display: none; color: #666; font-size: 14px; margin-top: -10px;">
+                <div class="form-group" id="addRecordCalculatedValue"
+                    style="display: none; color: #666; font-size: 14px; margin-top: -10px;">
                     <span id="addRecordCalculatedText"></span>
                 </div>
                 <div class="form-group">
                     <label>图片（可选）：</label>
-                    <input type="file" id="addRecordImage" accept="image/*" onchange="handleImageUpload('add', 'record', this)">
+                    <input type="file" id="addRecordImage" accept="image/*"
+                        onchange="handleImageUpload('add', 'record', this)">
                     <input type="hidden" id="addRecordImagePath">
                     <div id="addRecordImagePreview" style="margin-top: 10px; display: none;">
-                        <img id="addRecordImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
-                        <button type="button" class="btn-icon" onclick="removeImage('add', 'record')" style="margin-left: 10px;">删除</button>
+                        <img id="addRecordImagePreviewImg"
+                            style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('add', 'record')"
+                            style="margin-left: 10px;">删除</button>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary">添加</button>
@@ -201,8 +211,10 @@
                 <div class="form-group">
                     <label>输入方式（二选一）：</label>
                     <div class="toggle-buttons" style="display: flex; gap: 5px; margin: 10px 0;">
-                        <button type="button" class="toggle-btn toggle-btn-active" id="editRecordModeLiters" onclick="setRecordInputMode('edit', 'liters')">加油量(L)</button>
-                        <button type="button" class="toggle-btn" id="editRecordModePricePerLiter" onclick="setRecordInputMode('edit', 'pricePerLiter')">单价(元/L)</button>
+                        <button type="button" class="toggle-btn toggle-btn-active" id="editRecordModeLiters"
+                            onclick="setRecordInputMode('edit', 'liters')">加油量(L)</button>
+                        <button type="button" class="toggle-btn" id="editRecordModePricePerLiter"
+                            onclick="setRecordInputMode('edit', 'pricePerLiter')">单价(元/L)</button>
                     </div>
                 </div>
                 <div class="form-group" id="editRecordInputGroup">
@@ -212,18 +224,23 @@
                 </div>
                 <div class="form-group">
                     <label>总价（元）：</label>
-                    <input type="number" id="editRecordPrice" step="0.01" required placeholder="例如：350.00" oninput="calculateRecordValues('edit')">
+                    <input type="number" id="editRecordPrice" step="0.01" required placeholder="例如：350.00"
+                        oninput="calculateRecordValues('edit')">
                 </div>
-                <div class="form-group" id="editRecordCalculatedValue" style="display: none; color: #666; font-size: 14px; margin-top: -10px;">
+                <div class="form-group" id="editRecordCalculatedValue"
+                    style="display: none; color: #666; font-size: 14px; margin-top: -10px;">
                     <span id="editRecordCalculatedText"></span>
                 </div>
                 <div class="form-group">
                     <label>图片（可选）：</label>
-                    <input type="file" id="editRecordImage" accept="image/*" onchange="handleImageUpload('edit', 'record', this)">
+                    <input type="file" id="editRecordImage" accept="image/*"
+                        onchange="handleImageUpload('edit', 'record', this)">
                     <input type="hidden" id="editRecordImagePath">
                     <div id="editRecordImagePreview" style="margin-top: 10px; display: none;">
-                        <img id="editRecordImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
-                        <button type="button" class="btn-icon" onclick="removeImage('edit', 'record')" style="margin-left: 10px;">删除</button>
+                        <img id="editRecordImagePreviewImg"
+                            style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('edit', 'record')"
+                            style="margin-left: 10px;">删除</button>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary">保存</button>
@@ -246,12 +263,19 @@
                     <input type="number" id="expenseAmount" step="0.01" required placeholder="例如：500.00">
                 </div>
                 <div class="form-group">
+                    <label>描述（可选）：</label>
+                    <input type="text" id="expenseTitle" placeholder="例如：洗车、保养、贴膜等">
+                </div>
+                <div class="form-group">
                     <label>图片（可选）：</label>
-                    <input type="file" id="addExpenseImage" accept="image/*" onchange="handleImageUpload('add', 'expense', this)">
+                    <input type="file" id="addExpenseImage" accept="image/*"
+                        onchange="handleImageUpload('add', 'expense', this)">
                     <input type="hidden" id="addExpenseImagePath">
                     <div id="addExpenseImagePreview" style="margin-top: 10px; display: none;">
-                        <img id="addExpenseImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
-                        <button type="button" class="btn-icon" onclick="removeImage('add', 'expense')" style="margin-left: 10px;">删除</button>
+                        <img id="addExpenseImagePreviewImg"
+                            style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('add', 'expense')"
+                            style="margin-left: 10px;">删除</button>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary">添加</button>
@@ -275,12 +299,19 @@
                     <input type="number" id="editExpenseAmount" step="0.01" required placeholder="例如：500.00">
                 </div>
                 <div class="form-group">
+                    <label>描述（可选）：</label>
+                    <input type="text" id="editExpenseTitle" placeholder="例如：洗车、保养、贴膜等">
+                </div>
+                <div class="form-group">
                     <label>图片（可选）：</label>
-                    <input type="file" id="editExpenseImage" accept="image/*" onchange="handleImageUpload('edit', 'expense', this)">
+                    <input type="file" id="editExpenseImage" accept="image/*"
+                        onchange="handleImageUpload('edit', 'expense', this)">
                     <input type="hidden" id="editExpenseImagePath">
                     <div id="editExpenseImagePreview" style="margin-top: 10px; display: none;">
-                        <img id="editExpenseImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
-                        <button type="button" class="btn-icon" onclick="removeImage('edit', 'expense')" style="margin-left: 10px;">删除</button>
+                        <img id="editExpenseImagePreviewImg"
+                            style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('edit', 'expense')"
+                            style="margin-left: 10px;">删除</button>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary">保存</button>
@@ -331,11 +362,14 @@
                 </div>
                 <div class="form-group">
                     <label>图片（可选）：</label>
-                    <input type="file" id="addMaintenanceRecordImage" accept="image/*" onchange="handleImageUpload('add', 'maintenanceRecord', this)">
+                    <input type="file" id="addMaintenanceRecordImage" accept="image/*"
+                        onchange="handleImageUpload('add', 'maintenanceRecord', this)">
                     <input type="hidden" id="addMaintenanceRecordImagePath">
                     <div id="addMaintenanceRecordImagePreview" style="margin-top: 10px; display: none;">
-                        <img id="addMaintenanceRecordImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
-                        <button type="button" class="btn-icon" onclick="removeImage('add', 'maintenance')" style="margin-left: 10px;">删除</button>
+                        <img id="addMaintenanceRecordImagePreviewImg"
+                            style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('add', 'maintenance')"
+                            style="margin-left: 10px;">删除</button>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary">添加</button>
@@ -368,11 +402,14 @@
                 </div>
                 <div class="form-group">
                     <label>图片（可选）：</label>
-                    <input type="file" id="editMaintenanceRecordImage" accept="image/*" onchange="handleImageUpload('edit', 'maintenanceRecord', this)">
+                    <input type="file" id="editMaintenanceRecordImage" accept="image/*"
+                        onchange="handleImageUpload('edit', 'maintenanceRecord', this)">
                     <input type="hidden" id="editMaintenanceRecordImagePath">
                     <div id="editMaintenanceRecordImagePreview" style="margin-top: 10px; display: none;">
-                        <img id="editMaintenanceRecordImagePreviewImg" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
-                        <button type="button" class="btn-icon" onclick="removeImage('edit', 'maintenance')" style="margin-left: 10px;">删除</button>
+                        <img id="editMaintenanceRecordImagePreviewImg"
+                            style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd;">
+                        <button type="button" class="btn-icon" onclick="removeImage('edit', 'maintenance')"
+                            style="margin-left: 10px;">删除</button>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary">保存</button>
@@ -388,22 +425,29 @@
             <div class="form-group">
                 <label>选择导入方式：</label>
                 <div style="margin: 15px 0;">
-                    <button type="button" class="btn btn-primary" onclick="document.getElementById('importFileInput').click()" style="margin-right: 10px;">选择文件</button>
+                    <button type="button" class="btn btn-primary"
+                        onclick="document.getElementById('importFileInput').click()"
+                        style="margin-right: 10px;">选择文件</button>
                     <button type="button" class="btn btn-primary" onclick="pasteFromClipboard()">从剪切板粘贴</button>
                 </div>
-                <input type="file" id="importFileInput" accept=".csv,.txt" style="display: none;" onchange="handleFileImport(event)">
+                <input type="file" id="importFileInput" accept=".csv,.txt" style="display: none;"
+                    onchange="handleFileImport(event)">
             </div>
             <div class="form-group">
                 <label>或直接粘贴CSV数据：</label>
-                <textarea id="importDataText" rows="10" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;" placeholder="粘贴CSV格式数据，第一行为表头"></textarea>
+                <textarea id="importDataText" rows="10"
+                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;"
+                    placeholder="粘贴CSV格式数据，第一行为表头"></textarea>
             </div>
             <div style="margin-top: 15px;">
                 <button type="button" class="btn btn-primary" onclick="processImport()">导入</button>
-                <button type="button" class="btn" onclick="closeModal('importModal')" style="margin-left: 10px;">取消</button>
+                <button type="button" class="btn" onclick="closeModal('importModal')"
+                    style="margin-left: 10px;">取消</button>
             </div>
             <div id="importPreview" style="margin-top: 15px; display: none;">
                 <h4>预览（前5行）：</h4>
-                <pre id="importPreviewContent" style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 200px; overflow: auto;"></pre>
+                <pre id="importPreviewContent"
+                    style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 200px; overflow: auto;"></pre>
             </div>
         </div>
     </div>
@@ -420,22 +464,30 @@
             <div class="form-group">
                 <label>选择导入方式：</label>
                 <div style="margin: 15px 0;">
-                    <button type="button" class="btn btn-primary" onclick="document.getElementById('importFileInputForNewVehicle').click()" style="margin-right: 10px;">选择文件</button>
-                    <button type="button" class="btn btn-primary" onclick="pasteFromClipboardForNewVehicle()">从剪切板粘贴</button>
+                    <button type="button" class="btn btn-primary"
+                        onclick="document.getElementById('importFileInputForNewVehicle').click()"
+                        style="margin-right: 10px;">选择文件</button>
+                    <button type="button" class="btn btn-primary"
+                        onclick="pasteFromClipboardForNewVehicle()">从剪切板粘贴</button>
                 </div>
-                <input type="file" id="importFileInputForNewVehicle" accept=".csv,.txt" style="display: none;" onchange="handleFileImportForNewVehicle(event)">
+                <input type="file" id="importFileInputForNewVehicle" accept=".csv,.txt" style="display: none;"
+                    onchange="handleFileImportForNewVehicle(event)">
             </div>
             <div class="form-group">
                 <label>或直接粘贴CSV数据：</label>
-                <textarea id="importDataTextForNewVehicle" rows="10" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;" placeholder="粘贴CSV格式数据，第一行为表头。格式：里程数(km), 加油量(L), 加油价格(元)"></textarea>
+                <textarea id="importDataTextForNewVehicle" rows="10"
+                    style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px;"
+                    placeholder="粘贴CSV格式数据，第一行为表头。格式：里程数(km), 加油量(L), 加油价格(元)"></textarea>
             </div>
             <div style="margin-top: 15px;">
                 <button type="button" class="btn btn-primary" onclick="processImportForNewVehicle()">创建车辆并导入</button>
-                <button type="button" class="btn" onclick="closeModal('importForNewVehicleModal')" style="margin-left: 10px;">取消</button>
+                <button type="button" class="btn" onclick="closeModal('importForNewVehicleModal')"
+                    style="margin-left: 10px;">取消</button>
             </div>
             <div id="importPreviewForNewVehicle" style="margin-top: 15px; display: none;">
                 <h4>预览（前5行）：</h4>
-                <pre id="importPreviewContentForNewVehicle" style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 200px; overflow: auto;"></pre>
+                <pre id="importPreviewContentForNewVehicle"
+                    style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 200px; overflow: auto;"></pre>
             </div>
         </div>
     </div>
@@ -463,8 +515,46 @@
         </div>
     </div>
 
+    <!-- 锁定/解锁模态框 -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('passwordModal')">&times;</span>
+            <h3 id="passwordModalTitle">车辆解锁</h3>
+            <div class="form-group">
+                <label id="passwordLabel">请输入密码：</label>
+                <input type="password" id="vehiclePasswordInput" placeholder="请输入密码">
+            </div>
+            <div style="margin-top: 15px;">
+                <button type="button" class="btn btn-primary" id="passwordConfirmBtn">确定</button>
+                <button type="button" class="btn" onclick="closeModal('passwordModal')"
+                    style="margin-left: 10px;">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置密码模态框 -->
+    <div id="setPasswordModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('setPasswordModal')">&times;</span>
+            <h3>设置车辆密码</h3>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">设置密码后，查看和修改该车辆数据将需要输入密码。留空并保存可取消密码。</p>
+            <div class="form-group">
+                <label>新密码：</label>
+                <input type="password" id="newPassword" placeholder="留空则取消密码">
+            </div>
+            <div class="form-group">
+                <label>确认新密码：</label>
+                <input type="password" id="confirmNewPassword" placeholder="再次输入新密码">
+            </div>
+            <div style="margin-top: 15px;">
+                <button type="button" class="btn btn-primary" onclick="setVehiclePassword()">保存设置</button>
+                <button type="button" class="btn" onclick="closeModal('setPasswordModal')"
+                    style="margin-left: 10px;">取消</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/app.js"></script>
 </body>
+
 </html>
-
-

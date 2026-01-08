@@ -29,7 +29,7 @@ const upload = multer({
     const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-    
+
     if (mimetype && extname) {
       return cb(null, true);
     } else {
@@ -42,9 +42,9 @@ const upload = multer({
 async function compressImage(buffer, outputPath) {
   try {
     await sharp(buffer)
-      .resize(1920, 1920, { 
-        fit: 'inside', 
-        withoutEnlargement: true 
+      .resize(1920, 1920, {
+        fit: 'inside',
+        withoutEnlargement: true
       })
       .jpeg({ quality: 80 })
       .toFile(outputPath);
@@ -70,7 +70,7 @@ app.post('/api/upload-image', upload.single('image'), async (req, res) => {
 
     // 压缩图片
     const success = await compressImage(req.file.buffer, outputPath);
-    
+
     if (success) {
       // 返回图片URL
       const imageUrl = `/uploads/${filename}`;
@@ -123,6 +123,39 @@ app.delete('/api/vehicles/:id', (req, res) => {
       res.status(500).json({ error: err.message });
     } else {
       res.json({ message: '车辆删除成功' });
+    }
+  });
+});
+
+// 设置/取消车辆密码
+app.post('/api/vehicles/:id/password', (req, res) => {
+  const vehicleId = parseInt(req.params.id);
+  const { password } = req.body; // 可以为 null 表示取消密码
+  db.updateVehiclePassword(vehicleId, password, (err) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json({ message: password ? '密码设置成功' : '密码已取消' });
+    }
+  });
+});
+
+// 验证车辆密码
+app.post('/api/vehicles/:id/verify-password', (req, res) => {
+  const vehicleId = parseInt(req.params.id);
+  const { password } = req.body;
+  db.getAllVehicles((err, vehicles) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+    } else {
+      const vehicle = vehicles.find(v => v.id === vehicleId);
+      if (!vehicle) {
+        res.status(404).json({ error: '车辆不存在' });
+      } else if (vehicle.password === password) {
+        res.json({ success: true });
+      } else {
+        res.status(401).json({ success: false, error: '密码错误' });
+      }
     }
   });
 });
@@ -428,59 +461,59 @@ app.delete('/api/maintenance-records/:id', (req, res) => {
 // 获取车辆维保提醒信息
 app.get('/api/vehicles/:id/maintenance-alerts', (req, res) => {
   const vehicleId = parseInt(req.params.id);
-  
+
   // 获取车辆当前里程
   db.getAllVehicles((err, vehicles) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
-    
+
     const vehicle = vehicles.find(v => v.id === vehicleId);
     if (!vehicle) {
       return res.status(404).json({ error: '车辆不存在' });
     }
-    
+
     const currentMileage = vehicle.current_mileage;
-    
+
     // 获取维保设置
     db.getMaintenanceSettings(vehicleId, (err, settings) => {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
-      
+
       // 获取维保记录
       db.getMaintenanceRecords(vehicleId, (err, records) => {
         if (err) {
           return res.status(500).json({ error: err.message });
         }
-        
+
         // 获取车辆初始里程（从加油记录中获取最小里程）
         db.getRefuelRecords(vehicleId, (err2, refuelRecords) => {
           if (err2) {
             return res.status(500).json({ error: err2.message });
           }
-          
+
           const alerts = [];
-          
+
           // 找到最小里程（初始里程）
           const initialMileage = refuelRecords.length > 0
             ? Math.min(...refuelRecords.map(r => r.mileage))
             : currentMileage;
-          
+
           for (const setting of settings) {
             // 找到该维保间隔的最后一次维保记录
             const relevantRecords = records.filter(r => r.mileage <= currentMileage);
-            const lastMaintenance = relevantRecords.length > 0 
+            const lastMaintenance = relevantRecords.length > 0
               ? relevantRecords.reduce((max, r) => r.mileage > max.mileage ? r : max, relevantRecords[0])
               : null;
-            
+
             // 如果没有任何维保记录，从初始里程开始计算
             const lastMaintenanceMileage = lastMaintenance ? lastMaintenance.mileage : initialMileage;
-            
+
             // 计算下次应该维保的里程（基于上次维保里程 + 间隔）
             const nextMaintenanceMileage = lastMaintenanceMileage + setting.interval_km;
             const mileageSinceLastMaintenance = currentMileage - lastMaintenanceMileage;
-            
+
             // 如果当前里程已达到或超过下次维保里程，则提醒
             if (currentMileage >= nextMaintenanceMileage) {
               const overdueKm = currentMileage - nextMaintenanceMileage;
@@ -497,7 +530,7 @@ app.get('/api/vehicles/:id/maintenance-alerts', (req, res) => {
               });
             }
           }
-          
+
           res.json(alerts);
         });
       });

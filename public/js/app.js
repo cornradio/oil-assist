@@ -2,11 +2,12 @@
 let vehicles = [];
 let currentVehicleId = null;
 let charts = {};
+let unlockedVehicles = new Set();
 
 // 页面加载时初始化
 document.addEventListener('DOMContentLoaded', () => {
     loadVehicles();
-    
+
     // 点击页面其他地方时关闭菜单
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.vehicle-menu') && !e.target.closest('.record-menu') && !e.target.closest('.expense-menu')) {
@@ -28,7 +29,6 @@ async function loadVehicles() {
     }
 }
 
-// 渲染车辆列表
 function renderVehicles() {
     const container = document.getElementById('vehiclesList');
     if (vehicles.length === 0) {
@@ -36,22 +36,47 @@ function renderVehicles() {
         return;
     }
 
-    container.innerHTML = vehicles.map(vehicle => `
-        <div class="vehicle-item ${currentVehicleId === vehicle.id ? 'active' : ''}" 
-             onclick="selectVehicle(${vehicle.id})">
-            <div class="vehicle-content">
-                <h3>${escapeHtml(vehicle.name)}</h3>
-                <p>当前里程：${vehicle.current_mileage.toFixed(1)} 公里</p>
-                <p>创建时间：${formatDate(vehicle.created_at)}</p>
-            </div>
-            <div class="vehicle-menu" onclick="event.stopPropagation()">
-                <button class="menu-btn" onclick="toggleVehicleMenu(${vehicle.id})">⋯</button>
-                <div class="menu-dropdown" id="menu-${vehicle.id}" style="display: none;">
-                    <button class="menu-item" onclick="deleteVehicle(${vehicle.id})">删除车辆</button>
+    container.innerHTML = vehicles.map(vehicle => {
+        const isSelected = currentVehicleId === vehicle.id;
+        const isUnlocked = unlockedVehicles.has(vehicle.id);
+        const lockIcon = vehicle.password ? (isUnlocked ? ' 🔓' : ' 🔒') : '';
+
+        // 根据是否有密码和是否解锁来显示不同的菜单项
+        let passwordMenuItem = '';
+        if (vehicle.password) {
+            if (isUnlocked) {
+                // 如果已解锁，显示“重新加锁”和“更改密码”
+                passwordMenuItem = `
+                    <button class="menu-item" onclick="lockVehicle(${vehicle.id})">重新加锁</button>
+                    <button class="menu-item" onclick="showSetPasswordModal(${vehicle.id})">更改密码</button>
+                `;
+            } else {
+                // 如果未解锁，只显示“更改密码”（虽然正常需要解锁才能改，但逻辑上先放着）
+                passwordMenuItem = `<button class="menu-item" onclick="showSetPasswordModal(${vehicle.id})">更改密码</button>`;
+            }
+        } else {
+            // 没有密码，显示“设置密码”
+            passwordMenuItem = `<button class="menu-item" onclick="showSetPasswordModal(${vehicle.id})">设置密码</button>`;
+        }
+
+        return `
+            <div class="vehicle-item ${isSelected ? 'active' : ''}" 
+                 onclick="selectVehicle(${vehicle.id})">
+                <div class="vehicle-content">
+                    <h3>${escapeHtml(vehicle.name)}${lockIcon}</h3>
+                    <p>当前里程：${vehicle.current_mileage.toFixed(1)} 公里</p>
+                    <p>创建时间：${formatDate(vehicle.created_at)}</p>
+                </div>
+                <div class="vehicle-menu" onclick="event.stopPropagation()">
+                    <button class="menu-btn" onclick="toggleVehicleMenu(${vehicle.id})">⋯</button>
+                    <div class="menu-dropdown" id="menu-${vehicle.id}" style="display: none;">
+                        ${passwordMenuItem}
+                        <button class="menu-item menu-item-danger" onclick="deleteVehicle(${vehicle.id})">删除车辆</button>
+                    </div>
                 </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // 切换车辆菜单
@@ -62,7 +87,7 @@ function toggleVehicleMenu(vehicleId) {
             menu.style.display = 'none';
         }
     });
-    
+
     // 切换当前菜单
     const menu = document.getElementById(`menu-${vehicleId}`);
     if (menu) {
@@ -71,14 +96,58 @@ function toggleVehicleMenu(vehicleId) {
 }
 
 // 选择车辆
-function selectVehicle(vehicleId) {
+async function selectVehicle(vehicleId) {
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    if (!vehicle) return;
+
+    // 如果有密码且未解锁
+    if (vehicle.password && !unlockedVehicles.has(vehicleId)) {
+        // 尝试从 localStorage 获取密码并验证
+        const savedPasswords = JSON.parse(localStorage.getItem('vehicle_passwords') || '{}');
+        const savedPwd = savedPasswords[vehicleId];
+
+        if (savedPwd) {
+            try {
+                const response = await fetch(`/api/vehicles/${vehicleId}/verify-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: savedPwd })
+                });
+
+                if (response.ok) {
+                    unlockedVehicles.add(vehicleId);
+                } else {
+                    // 如果保存的密码失效了，从本地删除并显示解锁框
+                    delete savedPasswords[vehicleId];
+                    localStorage.setItem('vehicle_passwords', JSON.stringify(savedPasswords));
+                    showUnlockModal(vehicleId);
+                    return;
+                }
+            } catch (error) {
+                console.error('自动解锁失败:', error);
+                showUnlockModal(vehicleId);
+                return;
+            }
+        } else {
+            showUnlockModal(vehicleId);
+            return;
+        }
+    }
+
     currentVehicleId = vehicleId;
     renderVehicles();
     document.getElementById('refuelSection').style.display = 'block';
     document.getElementById('expenseSection').style.display = 'block';
     document.getElementById('maintenanceSection').style.display = 'block';
     document.getElementById('statsSection').style.display = 'block';
-    
+
+    // 手机端自动滚动到加油记录
+    if (window.innerWidth <= 768) {
+        setTimeout(() => {
+            document.getElementById('refuelSection').scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+    }
+
     // 销毁所有现有图表
     Object.values(charts).forEach(chart => {
         if (chart) {
@@ -86,12 +155,12 @@ function selectVehicle(vehicleId) {
         }
     });
     charts = {};
-    
+
     loadVehicleRecords();
     loadExtraExpenses();
     loadMaintenanceData();
     loadVehicleStats();
-    
+
     // 关闭所有菜单
     document.querySelectorAll('.menu-dropdown').forEach(menu => {
         menu.style.display = 'none';
@@ -103,7 +172,7 @@ function refreshStats() {
     if (!currentVehicleId) {
         return;
     }
-    
+
     // 销毁所有现有图表
     Object.values(charts).forEach(chart => {
         if (chart) {
@@ -111,7 +180,7 @@ function refreshStats() {
         }
     });
     charts = {};
-    
+
     loadVehicleStats();
     loadVehicleRecords();
     loadExtraExpenses();
@@ -151,7 +220,7 @@ function handleFileImportForNewVehicle(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         const content = e.target.result;
         document.getElementById('importDataTextForNewVehicle').value = content;
         previewImportDataForNewVehicle(content);
@@ -229,9 +298,9 @@ async function processImportForNewVehicle() {
         const vehicleResponse = await fetch('/api/vehicles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                name: vehicleName, 
-                current_mileage: minMileage 
+            body: JSON.stringify({
+                name: vehicleName,
+                current_mileage: minMileage
             })
         });
 
@@ -249,8 +318,8 @@ async function processImportForNewVehicle() {
         const existingRecords = await recordsResponse.json();
         if (existingRecords.length > 0) {
             // 删除初始记录（查找liters和price都为null或0的记录）
-            const initialRecord = existingRecords.find(r => 
-                (r.liters === null || r.liters === 0 || r.liters === undefined) && 
+            const initialRecord = existingRecords.find(r =>
+                (r.liters === null || r.liters === 0 || r.liters === undefined) &&
                 (r.price === null || r.price === 0 || r.price === undefined)
             );
             if (initialRecord) {
@@ -291,11 +360,11 @@ async function processImportForNewVehicle() {
         }
 
         closeModal('importForNewVehicleModal');
-        
+
         // 刷新数据并选择新创建的车辆
         await loadVehicles();
         selectVehicle(vehicleId);
-        
+
         if (failCount > 0) {
             alert(`导入完成：成功 ${successCount} 条，失败 ${failCount} 条`);
         } else {
@@ -380,7 +449,7 @@ async function loadVehicleRecords() {
 // 刷新加油记录（重新加载并重新计算）
 async function refreshRefuelRecords() {
     if (!currentVehicleId) return;
-    
+
     try {
         // 重新加载记录（会按里程数排序并重新计算所有数值）
         await loadVehicleRecords();
@@ -404,7 +473,7 @@ function renderRecords(records) {
 
     // 按里程数从低到高排序，用于计算油耗
     const sortedByMileage = [...records].sort((a, b) => a.mileage - b.mileage);
-    
+
     // 创建里程到记录的映射
     const mileageMap = new Map();
     sortedByMileage.forEach((r, i) => {
@@ -420,16 +489,16 @@ function renderRecords(records) {
     for (let i = 0; i < sortedForDisplay.length; i++) {
         const record = sortedForDisplay[i];
         // 检查是否为初始记录（liters或price为null/0/undefined）
-        const isInitialRecord = record.liters === null || record.liters === undefined || record.liters === 0 || 
-                                record.price === null || record.price === undefined || record.price === 0;
-        
+        const isInitialRecord = record.liters === null || record.liters === undefined || record.liters === 0 ||
+            record.price === null || record.price === undefined || record.price === 0;
+
         const litersDisplay = isInitialRecord ? '--' : record.liters.toFixed(2);
         const priceDisplay = isInitialRecord ? '--' : `¥${record.price.toFixed(2)}`;
         const pricePerLiter = isInitialRecord ? '--' : `¥${(record.price / record.liters).toFixed(2)}`;
         let fuelConsumption = '-';
         let mileageIncrease = '-';
         let costPerKm = '-';
-        
+
         // 找到当前记录在按里程排序后的位置
         const currentIndex = mileageMap.get(record.id);
         if (currentIndex !== undefined && currentIndex > 0) {
@@ -446,11 +515,11 @@ function renderRecords(records) {
                 }
             }
         }
-        
-        const imageCell = record.image_path 
+
+        const imageCell = record.image_path
             ? `<td><img src="${record.image_path}" alt="记录图片" style="max-width: 80px; max-height: 80px; border-radius: 4px; cursor: pointer;" onclick="showImageModal('${record.image_path}')"></td>`
             : '<td>--</td>';
-        
+
         tableRows += `
             <tr>
                 <td>${formatDate(record.refuel_date)}</td>
@@ -505,18 +574,18 @@ function showAddRecordModal() {
     }
     document.getElementById('addRecordModal').style.display = 'block';
     document.getElementById('addRecordForm').reset();
-    
+
     // 重置输入模式为加油量
     setRecordInputMode('add', 'liters');
-    
+
     // 清空图片
     removeImage('add', 'record');
-    
+
     // 设置默认日期为当前时间
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     document.getElementById('recordDate').value = now.toISOString().slice(0, 16);
-    
+
     // 自动填充当前里程数
     const currentVehicle = vehicles.find(v => v.id === currentVehicleId);
     if (currentVehicle) {
@@ -536,7 +605,7 @@ function setRecordInputMode(mode, inputMode) {
     const hiddenMode = document.getElementById(`${inputPrefix}RecordInputMode`);
     const calculatedValue = document.getElementById(`${prefix}RecordCalculatedValue`);
     const priceInput = document.getElementById(`${inputPrefix}RecordPrice`);
-    
+
     // 更新按钮状态
     if (inputMode === 'liters') {
         litersBtn.classList.add('toggle-btn-active');
@@ -549,17 +618,17 @@ function setRecordInputMode(mode, inputMode) {
         inputLabel.textContent = '单价（元/L）：';
         inputValue.placeholder = '例如：7.50';
     }
-    
+
     // 更新隐藏的mode值
     hiddenMode.value = inputMode;
-    
+
     // 清空输入值
     inputValue.value = '';
-    
+
     // 隐藏计算结果
     calculatedValue.style.display = 'none';
     calculatedValue.querySelector('span').textContent = '';
-    
+
     // 如果有总价，重新计算
     if (priceInput && priceInput.value) {
         calculateRecordValues(mode);
@@ -577,14 +646,14 @@ function calculateRecordValues(mode) {
     const calculatedValue = document.getElementById(`${prefix}RecordCalculatedValue`);
     const calculatedText = document.getElementById(`${prefix}RecordCalculatedText`);
     const inputMode = hiddenMode ? hiddenMode.value : 'liters';
-    
+
     const price = parseFloat(priceInput.value);
-    
+
     if (isNaN(price) || price <= 0) {
         calculatedValue.style.display = 'none';
         return;
     }
-    
+
     if (inputMode === 'liters') {
         // 输入加油量，计算单价
         const liters = parseFloat(inputValue.value);
@@ -616,7 +685,7 @@ function toggleRecordMenu(recordId) {
             menu.style.display = 'none';
         }
     });
-    
+
     // 切换当前菜单
     const menu = document.getElementById(`record-menu-${recordId}`);
     if (menu) {
@@ -697,7 +766,7 @@ async function showEditRecordModal(recordId) {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/records`);
         const records = await response.json();
         const record = records.find(r => r.id === recordId);
-        
+
         if (!record) {
             return;
         }
@@ -713,7 +782,7 @@ async function showEditRecordModal(recordId) {
         document.getElementById('editRecordInputValue').value = record.liters || '';
         document.getElementById('editRecordPrice').value = record.price || '';
         document.getElementById('editRecordMileage').value = record.mileage;
-        
+
         // 加载图片
         if (record.image_path) {
             document.getElementById('editRecordImagePath').value = record.image_path;
@@ -723,7 +792,7 @@ async function showEditRecordModal(recordId) {
             document.getElementById('editRecordImagePath').value = '';
             document.getElementById('editRecordImagePreview').style.display = 'none';
         }
-        
+
         document.getElementById('editRecordModal').style.display = 'block';
     } catch (error) {
         console.error('加载记录失败:', error);
@@ -823,13 +892,13 @@ async function loadVehicleStats() {
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/stats`);
         const stats = await response.json();
-        
+
         // 加载额外消费统计
         const expenseResponse = await fetch(`/api/vehicles/${currentVehicleId}/expense-stats`);
         const expenseStats = await expenseResponse.json();
-        
+
         renderStats(stats, expenseStats);
-        
+
         // 加载图表数据
         const recordsResponse = await fetch(`/api/vehicles/${currentVehicleId}/records`);
         const records = await recordsResponse.json();
@@ -890,7 +959,7 @@ function renderStats(stats, expenseStats) {
 // 渲染图表
 function renderCharts(records, stats) {
     console.log('渲染图表，记录数量:', records.length, records);
-    
+
     if (!records || records.length < 1) {
         // 数据不足，显示提示，但保留canvas元素
         const wrappers = document.querySelectorAll('.chart-wrapper');
@@ -913,7 +982,7 @@ function renderCharts(records, stats) {
         });
         return;
     }
-    
+
     // 移除提示信息，显示canvas
     document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
         const msg = wrapper.querySelector('.no-data-message');
@@ -928,22 +997,22 @@ function renderCharts(records, stats) {
 
     // 按里程数从小到大排序，确保油耗计算正确
     const sortedByMileage = [...records].sort((a, b) => a.mileage - b.mileage);
-    
+
     // 为了保持图表横坐标按日期显示，我们需要创建映射
     // 先按日期排序用于横坐标标签
     const sortedByDate = [...records].sort((a, b) => new Date(a.refuel_date) - new Date(b.refuel_date));
     const allLabels = sortedByDate.map(r => formatDate(r.refuel_date, true));
-    
+
     // 创建ID到日期索引的映射，用于将按里程计算的油耗映射到按日期排序的位置
     const dateIndexMap = new Map();
     sortedByDate.forEach((r, i) => {
         dateIndexMap.set(r.id, i);
     });
-    
+
     const fuelConsumptionData = [];
     const costData = [];
     const priceData = [];
-    
+
     // 初始化数组，长度与记录数相同（按日期索引）
     for (let i = 0; i < records.length; i++) {
         fuelConsumptionData.push(null);
@@ -959,7 +1028,7 @@ function renderCharts(records, stats) {
             costData[i] = record.price;
         }
         // 如果有加油量和价格，显示单价
-        if (record.liters !== null && record.liters !== undefined && record.liters > 0 && 
+        if (record.liters !== null && record.liters !== undefined && record.liters > 0 &&
             record.price !== null && record.price !== undefined && record.price > 0) {
             priceData[i] = parseFloat((record.price / record.liters).toFixed(2));
         }
@@ -967,10 +1036,10 @@ function renderCharts(records, stats) {
 
     // 计算油耗（需要按里程排序，然后映射到日期索引）
     for (let i = 1; i < sortedByMileage.length; i++) {
-        const prevRecord = sortedByMileage[i-1];
+        const prevRecord = sortedByMileage[i - 1];
         const currentRecord = sortedByMileage[i];
         const distance = currentRecord.mileage - prevRecord.mileage;
-        
+
         // 只有当前记录有加油量且里程增加时，才计算油耗
         if (distance > 0 && currentRecord.liters !== null && currentRecord.liters !== undefined && currentRecord.liters > 0) {
             const consumption = (currentRecord.liters / distance * 100).toFixed(2);
@@ -981,7 +1050,7 @@ function renderCharts(records, stats) {
             }
         }
     }
-    
+
     // 如果没有有效的数据点（比如里程没有增加），也显示提示
     if (fuelConsumptionData.length === 0) {
         const wrappers = document.querySelectorAll('.chart-wrapper');
@@ -1004,7 +1073,7 @@ function renderCharts(records, stats) {
         });
         return;
     }
-    
+
     // 移除提示信息，显示canvas
     document.querySelectorAll('.chart-wrapper').forEach(wrapper => {
         const msg = wrapper.querySelector('.no-data-message');
@@ -1030,7 +1099,7 @@ function renderCharts(records, stats) {
         console.error('无法找到fuelConsumptionChart元素');
         return;
     }
-    
+
     // 油耗图表
     const fuelCtx = fuelCanvas.getContext('2d');
     if (charts.fuelConsumption) {
@@ -1114,7 +1183,7 @@ function renderCharts(records, stats) {
         costChartWrapper.innerHTML = '<canvas id="costChart"></canvas>';
         costCanvas = document.getElementById('costChart');
     }
-    
+
     // 费用图表
     const costCtx = costCanvas.getContext('2d');
     if (charts.cost) {
@@ -1202,7 +1271,7 @@ function renderCharts(records, stats) {
         console.error('无法找到priceChart元素');
         return;
     }
-    
+
     // 单价图表
     const priceCtx = priceCanvas.getContext('2d');
     if (charts.price) {
@@ -1286,7 +1355,7 @@ function closeModal(modalId) {
 }
 
 // 点击模态框外部关闭
-window.onclick = function(event) {
+window.onclick = function (event) {
     const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
         if (event.target === modal) {
@@ -1313,22 +1382,22 @@ function formatDate(dateString, short = false) {
 
 // 展开图表到全屏
 function expandChart(chartId) {
-    const chartName = chartId === 'fuelConsumptionChart' ? 'fuelConsumption' : 
-                      chartId === 'costChart' ? 'cost' : 'price';
+    const chartName = chartId === 'fuelConsumptionChart' ? 'fuelConsumption' :
+        chartId === 'costChart' ? 'cost' : 'price';
     const chart = charts[chartName];
-    
+
     if (!chart) {
         return;
     }
-    
+
     const modal = document.getElementById('chartModal');
     const canvasContainer = document.getElementById('chartModalCanvas');
-    
+
     // 创建新的canvas用于全屏显示
     canvasContainer.innerHTML = `<canvas id="fullscreen-${chartId}"></canvas>`;
     const fullscreenCanvas = document.getElementById(`fullscreen-${chartId}`);
     const ctx = fullscreenCanvas.getContext('2d');
-    
+
     // 复制图表配置
     const originalConfig = chart.config;
     const config = {
@@ -1347,13 +1416,13 @@ function expandChart(chartId) {
             }
         }
     };
-    
+
     // 创建新图表
     const fullscreenChart = new Chart(ctx, config);
-    
+
     // 显示模态框
     modal.style.display = 'block';
-    
+
     // 保存全屏图表引用以便关闭时销毁
     window.fullscreenChart = fullscreenChart;
 }
@@ -1362,13 +1431,13 @@ function expandChart(chartId) {
 function closeChartModal() {
     const modal = document.getElementById('chartModal');
     modal.style.display = 'none';
-    
+
     // 销毁全屏图表
     if (window.fullscreenChart) {
         window.fullscreenChart.destroy();
         window.fullscreenChart = null;
     }
-    
+
     document.getElementById('chartModalCanvas').innerHTML = '';
 }
 
@@ -1396,13 +1465,14 @@ function renderExpenses(expenses) {
     let tableRows = '';
     for (let i = 0; i < expenses.length; i++) {
         const expense = expenses[i];
-        const imageCell = expense.image_path 
+        const imageCell = expense.image_path
             ? `<td><img src="${expense.image_path}" alt="记录图片" style="max-width: 80px; max-height: 80px; border-radius: 4px; cursor: pointer;" onclick="showImageModal('${expense.image_path}')"></td>`
             : '<td>--</td>';
-        
+
         tableRows += `
             <tr>
                 <td>${formatDate(expense.expense_date)}</td>
+                <td>${escapeHtml(expense.title)}</td>
                 <td>¥${expense.amount.toFixed(2)}</td>
                 ${imageCell}
                 <td class="action-buttons">
@@ -1423,6 +1493,7 @@ function renderExpenses(expenses) {
             <thead>
                 <tr>
                     <th>日期</th>
+                    <th>描述</th>
                     <th>金额 (元)</th>
                     <th>图片</th>
                     <th>操作</th>
@@ -1443,7 +1514,7 @@ function toggleExpenseMenu(expenseId) {
             menu.style.display = 'none';
         }
     });
-    
+
     // 切换当前菜单
     const menu = document.getElementById(`expense-menu-${expenseId}`);
     if (menu) {
@@ -1458,13 +1529,14 @@ function showAddExpenseModal() {
     }
     document.getElementById('addExpenseModal').style.display = 'block';
     document.getElementById('addExpenseForm').reset();
-    
+
     // 清空图片
     removeImage('add', 'expense');
-    
+
     // 设置默认日期为今天
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('expenseDate').value = today;
+    document.getElementById('expenseTitle').value = '';
 }
 
 // 添加额外消费记录
@@ -1481,8 +1553,7 @@ async function addExtraExpense(event) {
         return;
     }
 
-    // 使用默认标题"消费"
-    const title = '消费';
+    const title = document.getElementById('expenseTitle').value.trim() || '消费';
     const imagePath = document.getElementById('addExpenseImagePath').value;
 
     try {
@@ -1520,7 +1591,7 @@ async function showEditExpenseModal(expenseId) {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`);
         const expenses = await response.json();
         const expense = expenses.find(e => e.id === expenseId);
-        
+
         if (!expense) {
             return;
         }
@@ -1530,7 +1601,8 @@ async function showEditExpenseModal(expenseId) {
         const date = new Date(expense.expense_date);
         document.getElementById('editExpenseDate').value = date.toISOString().split('T')[0];
         document.getElementById('editExpenseAmount').value = expense.amount;
-        
+        document.getElementById('editExpenseTitle').value = expense.title || '';
+
         // 加载图片
         if (expense.image_path) {
             document.getElementById('editExpenseImagePath').value = expense.image_path;
@@ -1540,7 +1612,7 @@ async function showEditExpenseModal(expenseId) {
             document.getElementById('editExpenseImagePath').value = '';
             document.getElementById('editExpenseImagePreview').style.display = 'none';
         }
-        
+
         document.getElementById('editExpenseModal').style.display = 'block';
     } catch (error) {
         console.error('加载消费记录失败:', error);
@@ -1562,8 +1634,7 @@ async function updateExtraExpense(event) {
         return;
     }
 
-    // 使用默认标题"消费"
-    const title = '消费';
+    const title = document.getElementById('editExpenseTitle').value.trim() || '消费';
     const imagePath = document.getElementById('editExpenseImagePath').value;
 
     try {
@@ -1620,15 +1691,15 @@ async function loadMaintenanceData() {
         // 加载维保提醒
         const alertsResponse = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-alerts`);
         const alerts = await alertsResponse.json();
-        
+
         // 加载维保设置
         const settingsResponse = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-settings`);
         const settings = await settingsResponse.json();
-        
+
         // 加载维保记录
         const recordsResponse = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-records`);
         const records = await recordsResponse.json();
-        
+
         renderMaintenanceAlerts(alerts);
         renderMaintenanceSettings(settings);
         renderMaintenanceRecords(records);
@@ -1640,12 +1711,12 @@ async function loadMaintenanceData() {
 // 渲染维保提醒
 function renderMaintenanceAlerts(alerts) {
     const container = document.getElementById('maintenanceAlerts');
-    
+
     if (alerts.length === 0) {
         container.innerHTML = '';
         return;
     }
-    
+
     let alertsHTML = '';
     for (const alert of alerts) {
         alertsHTML += `
@@ -1664,19 +1735,19 @@ function renderMaintenanceAlerts(alerts) {
             </div>
         `;
     }
-    
+
     container.innerHTML = alertsHTML;
 }
 
 // 渲染维保设置
 function renderMaintenanceSettings(settings) {
     const container = document.getElementById('maintenanceSettings');
-    
+
     if (settings.length === 0) {
         container.innerHTML = '<p style="color: #666; padding: 10px;">暂无维保设置，请点击右上角"设置"按钮添加</p>';
         return;
     }
-    
+
     let settingsHTML = '<h3 style="margin-bottom: 15px;">维保设置</h3><div style="display: flex; flex-wrap: wrap; gap: 10px;">';
     for (const setting of settings) {
         settingsHTML += `
@@ -1687,26 +1758,26 @@ function renderMaintenanceSettings(settings) {
         `;
     }
     settingsHTML += '</div>';
-    
+
     container.innerHTML = settingsHTML;
 }
 
 // 渲染维保记录
 function renderMaintenanceRecords(records) {
     const container = document.getElementById('maintenanceRecords');
-    
+
     if (records.length === 0) {
         container.innerHTML = '<h3 style="margin-bottom: 15px;">维保记录</h3><p style="color: #666; padding: 10px;">暂无维保记录</p>';
         return;
     }
-    
+
     let tableRows = '';
     for (let i = 0; i < records.length; i++) {
         const record = records[i];
-        const imageCell = record.image_path 
+        const imageCell = record.image_path
             ? `<td><img src="${record.image_path}" alt="记录图片" style="max-width: 80px; max-height: 80px; border-radius: 4px; cursor: pointer;" onclick="showImageModal('${record.image_path}')"></td>`
             : '<td>--</td>';
-        
+
         tableRows += `
             <tr>
                 <td>${formatDate(record.maintenance_date)}</td>
@@ -1726,7 +1797,7 @@ function renderMaintenanceRecords(records) {
             </tr>
         `;
     }
-    
+
     container.innerHTML = `
         <h3 style="margin-bottom: 15px;">维保记录</h3>
         <table class="records-table">
@@ -1817,21 +1888,21 @@ function showAddMaintenanceRecordModal(settingId) {
     if (!currentVehicleId) {
         return;
     }
-    
+
     // 如果从提醒中点击，保存settingId
     window.currentMaintenanceSettingId = settingId || null;
-    
+
     document.getElementById('addMaintenanceRecordModal').style.display = 'block';
     document.getElementById('addMaintenanceRecordForm').reset();
-    
+
     // 清空图片
     removeImage('add', 'maintenanceRecord');
-    
+
     // 设置默认日期为当前时间
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     document.getElementById('maintenanceRecordDate').value = now.toISOString().slice(0, 16);
-    
+
     // 自动填充当前里程数
     const currentVehicle = vehicles.find(v => v.id === currentVehicleId);
     if (currentVehicle) {
@@ -1893,7 +1964,7 @@ function toggleMaintenanceMenu(recordId) {
             menu.style.display = 'none';
         }
     });
-    
+
     const menu = document.getElementById(`maintenance-menu-${recordId}`);
     if (menu) {
         menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
@@ -1914,7 +1985,7 @@ async function showEditMaintenanceRecordModal(recordId) {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/maintenance-records`);
         const records = await response.json();
         const record = records.find(r => r.id === recordId);
-        
+
         if (!record) {
             return;
         }
@@ -1926,7 +1997,7 @@ async function showEditMaintenanceRecordModal(recordId) {
         document.getElementById('editMaintenanceRecordMileage').value = record.mileage;
         document.getElementById('editMaintenanceRecordDescription').value = record.description || '';
         document.getElementById('editMaintenanceRecordAmount').value = record.amount;
-        
+
         // 加载图片
         if (record.image_path) {
             document.getElementById('editMaintenanceRecordImagePath').value = record.image_path;
@@ -1936,7 +2007,7 @@ async function showEditMaintenanceRecordModal(recordId) {
             document.getElementById('editMaintenanceRecordImagePath').value = '';
             document.getElementById('editMaintenanceRecordImagePreview').style.display = 'none';
         }
-        
+
         document.getElementById('editMaintenanceRecordModal').style.display = 'block';
     } catch (error) {
         console.error('加载记录失败:', error);
@@ -2037,7 +2108,7 @@ async function exportSimpleCSV() {
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/records`);
         const records = await response.json();
-        
+
         if (records.length === 0) {
             alert('暂无记录可导出');
             closeModal('exportModal');
@@ -2053,14 +2124,14 @@ async function exportSimpleCSV() {
 
         for (let i = 0; i < sortedRecords.length; i++) {
             const record = sortedRecords[i];
-            
+
             // 导出所有记录，包括初始记录
             // 对于初始记录，加油量和价格导出为0
-            const liters = (record.liters !== null && record.liters !== undefined && record.liters > 0) 
+            const liters = (record.liters !== null && record.liters !== undefined && record.liters > 0)
                 ? record.liters : 0;
-            const price = (record.price !== null && record.price !== undefined && record.price > 0) 
+            const price = (record.price !== null && record.price !== undefined && record.price > 0)
                 ? record.price : 0;
-            
+
             const row = [
                 record.mileage.toFixed(1),
                 liters.toFixed(2),
@@ -2070,14 +2141,14 @@ async function exportSimpleCSV() {
         }
 
         const csvContent = rows.join('\n');
-        
+
         // 获取当前车辆名称
         const currentVehicle = vehicles.find(v => v.id === currentVehicleId);
         const vehicleName = currentVehicle ? currentVehicle.name : '未知车辆';
-        
+
         // 清理车辆名称中的特殊字符（Windows文件名不允许的字符）
         const sanitizedName = vehicleName.replace(/[\/\\:*?"<>|]/g, '_');
-        
+
         // 生成时间戳（格式：YYYYMMDD-HHmmss）
         const now = new Date();
         const year = now.getFullYear();
@@ -2087,10 +2158,10 @@ async function exportSimpleCSV() {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const seconds = String(now.getSeconds()).padStart(2, '0');
         const timestamp = `${year}${month}${day}-${hours}${minutes}${seconds}`;
-        
+
         // 生成文件名：车辆名字-加油记录-时间.csv
         const filename = `${sanitizedName}-加油记录-${timestamp}.csv`;
-        
+
         // 下载CSV文件
         downloadCSV(csvContent, filename);
         closeModal('exportModal');
@@ -2109,7 +2180,7 @@ async function exportFullTableCSV() {
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/records`);
         const records = await response.json();
-        
+
         if (records.length === 0) {
             alert('暂无记录可导出');
             closeModal('exportModal');
@@ -2118,7 +2189,7 @@ async function exportFullTableCSV() {
 
         // 按里程数从小到大排序，用于计算
         const sortedByMileage = [...records].sort((a, b) => a.mileage - b.mileage);
-        
+
         // 创建里程到记录的映射
         const mileageMap = new Map();
         sortedByMileage.forEach((r, i) => {
@@ -2132,19 +2203,19 @@ async function exportFullTableCSV() {
         // 按里程数从小到大排序导出
         for (let i = 0; i < sortedByMileage.length; i++) {
             const record = sortedByMileage[i];
-            
+
             // 检查是否为初始记录
-            const isInitialRecord = record.liters === null || record.liters === undefined || record.liters === 0 || 
-                                    record.price === null || record.price === undefined || record.price === 0;
-            
+            const isInitialRecord = record.liters === null || record.liters === undefined || record.liters === 0 ||
+                record.price === null || record.price === undefined || record.price === 0;
+
             const liters = isInitialRecord ? 0 : record.liters.toFixed(2);
             const price = isInitialRecord ? 0 : record.price.toFixed(2);
             const pricePerLiter = isInitialRecord ? '' : (record.price / record.liters).toFixed(2);
-            
+
             let mileageIncrease = '';
             let fuelConsumption = '';
             let costPerKm = '';
-            
+
             // 计算增加里程数、油耗、每公里费用
             if (i > 0) {
                 const prevRecord = sortedByMileage[i - 1];
@@ -2159,7 +2230,7 @@ async function exportFullTableCSV() {
                     }
                 }
             }
-            
+
             const row = [
                 formatDate(record.refuel_date),
                 record.mileage.toFixed(1),
@@ -2174,14 +2245,14 @@ async function exportFullTableCSV() {
         }
 
         const csvContent = rows.join('\n');
-        
+
         // 获取当前车辆名称
         const currentVehicle = vehicles.find(v => v.id === currentVehicleId);
         const vehicleName = currentVehicle ? currentVehicle.name : '未知车辆';
-        
+
         // 清理车辆名称中的特殊字符
         const sanitizedName = vehicleName.replace(/[\/\\:*?"<>|]/g, '_');
-        
+
         // 生成时间戳
         const now = new Date();
         const year = now.getFullYear();
@@ -2191,10 +2262,10 @@ async function exportFullTableCSV() {
         const minutes = String(now.getMinutes()).padStart(2, '0');
         const seconds = String(now.getSeconds()).padStart(2, '0');
         const timestamp = `${year}${month}${day}-${hours}${minutes}${seconds}`;
-        
+
         // 生成文件名：车辆名字-加油记录完整-时间.csv
         const filename = `${sanitizedName}-加油记录完整-${timestamp}.csv`;
-        
+
         // 下载CSV文件
         downloadCSV(csvContent, filename);
         closeModal('exportModal');
@@ -2213,7 +2284,7 @@ async function copyRecordsToClipboard() {
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/records`);
         const records = await response.json();
-        
+
         if (records.length === 0) {
             alert('暂无记录可复制');
             closeModal('exportModal');
@@ -2229,12 +2300,12 @@ async function copyRecordsToClipboard() {
 
         for (let i = 0; i < sortedRecords.length; i++) {
             const record = sortedRecords[i];
-            
-            const liters = (record.liters !== null && record.liters !== undefined && record.liters > 0) 
+
+            const liters = (record.liters !== null && record.liters !== undefined && record.liters > 0)
                 ? record.liters.toFixed(2) : '0';
-            const price = (record.price !== null && record.price !== undefined && record.price > 0) 
+            const price = (record.price !== null && record.price !== undefined && record.price > 0)
                 ? record.price.toFixed(2) : '0';
-            
+
             const row = [
                 record.mileage.toFixed(1),
                 liters,
@@ -2244,7 +2315,7 @@ async function copyRecordsToClipboard() {
         }
 
         const content = rows.join('\n');
-        
+
         // 复制到剪切板
         await navigator.clipboard.writeText(content);
         alert('已复制到剪切板');
@@ -2278,7 +2349,7 @@ async function exportExpenses() {
     try {
         const response = await fetch(`/api/vehicles/${currentVehicleId}/expenses`);
         const expenses = await response.json();
-        
+
         if (expenses.length === 0) {
             return;
         }
@@ -2287,13 +2358,14 @@ async function exportExpenses() {
         expenses.sort((a, b) => new Date(a.expense_date) - new Date(b.expense_date));
 
         // 生成CSV内容
-        const headers = ['日期', '金额(元)'];
+        const headers = ['日期', '描述', '金额(元)'];
         const rows = [headers.join(',')];
 
         for (let i = 0; i < expenses.length; i++) {
             const expense = expenses[i];
             const row = [
                 formatDate(expense.expense_date),
+                expense.title || '消费',
                 expense.amount.toFixed(2)
             ];
             rows.push(row.join(','));
@@ -2310,7 +2382,7 @@ async function exportExpenses() {
 function exportToCSV(csvContent, filename) {
     // 提供两个选项：下载文件或复制到剪切板
     const choice = confirm('选择导出方式：\n确定 = 下载文件\n取消 = 复制到剪切板');
-    
+
     if (choice) {
         // 下载文件
         const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -2337,7 +2409,7 @@ function showImportModal(type) {
     if (!currentVehicleId) {
         return;
     }
-    
+
     currentImportType = type;
     const title = type === 'refuel' ? '导入加油记录' : '导入额外消费';
     document.getElementById('importModalTitle').textContent = title;
@@ -2364,7 +2436,7 @@ function handleFileImport(event) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         const content = e.target.result;
         document.getElementById('importDataText').value = content;
         previewImportData(content);
@@ -2401,7 +2473,7 @@ async function processImport() {
         } else {
             await importExpenses(lines);
         }
-        
+
         closeModal('importModal');
     } catch (error) {
         console.error('导入失败:', error);
@@ -2427,7 +2499,7 @@ async function importRefuelRecords(lines) {
 
             if (isNaN(mileage) || isNaN(liters) || isNaN(price)) continue;
             if (mileage <= 0) continue;
-            
+
             // 允许导入初始记录（加油量和价格为0的情况）
             // 对于初始记录，将null值传给API（API会正确处理）
             const litersValue = (liters > 0) ? liters : 0;
@@ -2484,8 +2556,10 @@ async function importExpenses(lines) {
 
             if (isNaN(amount)) continue;
 
-            // 使用默认标题"消费"
-            const title = '消费';
+            let title = '消费';
+            if (values.length >= 3) {
+                title = values[1].trim() || '消费';
+            }
 
             // 转换日期格式
             let expenseDate;
@@ -2527,7 +2601,7 @@ function parseCSVLine(line) {
 
     for (let i = 0; i < line.length; i++) {
         const char = line[i];
-        
+
         if (char === '"') {
             if (inQuotes && line[i + 1] === '"') {
                 current += '"';
@@ -2543,7 +2617,7 @@ function parseCSVLine(line) {
         }
     }
     values.push(current);
-    
+
     return values;
 }
 
@@ -2555,7 +2629,7 @@ async function clearRefuelRecords() {
 
     // 强提示：需要输入确认文字
     const confirmText = prompt('⚠️ 警告：此操作将删除该车辆的所有加油记录（包括初始记录）！\n\n请输入"清空"以确认：');
-    
+
     if (confirmText !== '清空') {
         return;
     }
@@ -2594,11 +2668,11 @@ async function handleImageUpload(mode, type, input) {
     const previewImgId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}ImagePreviewImg`;
     const previewDiv = document.getElementById(previewId);
     const previewImg = document.getElementById(previewImgId);
-    
+
     previewDiv.style.display = 'block';
     previewImg.src = '';
     previewImg.alt = '上传中...';
-    
+
     // 创建FormData
     const formData = new FormData();
     formData.append('image', file);
@@ -2614,7 +2688,7 @@ async function handleImageUpload(mode, type, input) {
             // 保存图片路径
             const pathInputId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}ImagePath`;
             document.getElementById(pathInputId).value = result.imageUrl;
-            
+
             // 显示预览
             previewImg.src = result.imageUrl;
             previewImg.alt = '图片预览';
@@ -2636,7 +2710,7 @@ function removeImage(mode, type) {
     const previewId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}ImagePreview`;
     const pathInputId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}ImagePath`;
     const fileInputId = `${mode}${type.charAt(0).toUpperCase() + type.slice(1)}Image`;
-    
+
     document.getElementById(previewId).style.display = 'none';
     document.getElementById(pathInputId).value = '';
     document.getElementById(fileInputId).value = '';
@@ -2647,12 +2721,12 @@ function showImageModal(imageUrl) {
     const modal = document.createElement('div');
     modal.style.cssText = 'position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; cursor: pointer;';
     modal.onclick = () => modal.remove();
-    
+
     const img = document.createElement('img');
     img.src = imageUrl;
     img.style.cssText = 'max-width: 90%; max-height: 90%; object-fit: contain;';
     img.onclick = (e) => e.stopPropagation();
-    
+
     modal.appendChild(img);
     document.body.appendChild(modal);
 }
@@ -2665,7 +2739,7 @@ async function clearExpenses() {
 
     // 强提示：需要输入确认文字
     const confirmText = prompt('⚠️ 警告：此操作将删除该车辆的所有额外消费记录！\n\n请输入"清空"以确认：');
-    
+
     if (confirmText !== '清空') {
         return;
     }
@@ -2691,3 +2765,116 @@ async function clearExpenses() {
         console.error('清空记录失败:', error);
     }
 }
+
+// 密码管理相关功能
+let currentPasswordVehicleId = null;
+
+function showSetPasswordModal(vehicleId) {
+    currentPasswordVehicleId = vehicleId;
+    document.getElementById('setPasswordModal').style.display = 'block';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmNewPassword').value = '';
+}
+
+async function setVehiclePassword() {
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmNewPassword').value;
+
+    if (newPassword !== confirmPassword) {
+        alert('两次输入的密码不一致');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentPasswordVehicleId}/password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: newPassword || null })
+        });
+
+        if (response.ok) {
+            alert(newPassword ? '密码设置成功' : '密码已取消');
+            const savedPasswords = JSON.parse(localStorage.getItem('vehicle_passwords') || '{}');
+
+            if (!newPassword) {
+                unlockedVehicles.delete(currentPasswordVehicleId);
+                delete savedPasswords[currentPasswordVehicleId];
+            } else {
+                unlockedVehicles.add(currentPasswordVehicleId);
+                savedPasswords[currentPasswordVehicleId] = newPassword;
+            }
+
+            localStorage.setItem('vehicle_passwords', JSON.stringify(savedPasswords));
+            closeModal('setPasswordModal');
+            loadVehicles();
+        } else {
+            alert('设置失败');
+        }
+    } catch (error) {
+        console.error('设置密码失败:', error);
+    }
+}
+
+function showUnlockModal(vehicleId) {
+    currentPasswordVehicleId = vehicleId;
+    document.getElementById('passwordModal').style.display = 'block';
+    document.getElementById('vehiclePasswordInput').value = '';
+    document.getElementById('vehiclePasswordInput').focus();
+
+    // 设置确定按钮的点击事件
+    document.getElementById('passwordConfirmBtn').onclick = verifyPassword;
+}
+
+async function verifyPassword() {
+    const password = document.getElementById('vehiclePasswordInput').value;
+    if (!password) return;
+
+    try {
+        const response = await fetch(`/api/vehicles/${currentPasswordVehicleId}/verify-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+
+        if (response.ok) {
+            unlockedVehicles.add(currentPasswordVehicleId);
+            // 保存到 localStorage
+            const savedPasswords = JSON.parse(localStorage.getItem('vehicle_passwords') || '{}');
+            savedPasswords[currentPasswordVehicleId] = password;
+            localStorage.setItem('vehicle_passwords', JSON.stringify(savedPasswords));
+
+            closeModal('passwordModal');
+            selectVehicle(currentPasswordVehicleId);
+        } else {
+            alert('密码错误');
+            document.getElementById('vehiclePasswordInput').value = '';
+        }
+    } catch (error) {
+        console.error('验证密码失败:', error);
+    }
+}
+
+// 重新加锁（忘记本地存储的密码）
+function lockVehicle(vehicleId) {
+    unlockedVehicles.delete(vehicleId);
+    const savedPasswords = JSON.parse(localStorage.getItem('vehicle_passwords') || '{}');
+    delete savedPasswords[vehicleId];
+    localStorage.setItem('vehicle_passwords', JSON.stringify(savedPasswords));
+
+    if (currentVehicleId === vehicleId) {
+        currentVehicleId = null;
+        document.getElementById('refuelSection').style.display = 'none';
+        document.getElementById('expenseSection').style.display = 'none';
+        document.getElementById('maintenanceSection').style.display = 'none';
+        document.getElementById('statsSection').style.display = 'none';
+    }
+
+    renderVehicles();
+}
+
+// 监听锁定模态框中的回车键
+document.getElementById('vehiclePasswordInput')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        verifyPassword();
+    }
+});

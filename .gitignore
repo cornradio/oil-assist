@@ -6,7 +6,7 @@ node_modules/
 .env
 *.log
 public/uploads/
-# Docker 镜像 tar 文件
-oil-assist-*.tar
+# 所有 tar 文件
+*.tar
 
 

@@ -20,24 +20,28 @@ function initDatabase() {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     current_mileage REAL NOT NULL,
+    password TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`, (err) => {
     if (err) {
       console.error('创建车辆表错误:', err.message);
+    } else {
+      // 添加password字段
+      db.run(`ALTER TABLE vehicles ADD COLUMN password TEXT`, (alterErr) => { });
     }
   });
 
   // 加油记录表
-  db.run(`CREATE TABLE IF NOT EXISTS refuel_records (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    vehicle_id INTEGER NOT NULL,
-    liters REAL,
-    price REAL,
-    mileage REAL NOT NULL,
-    refuel_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    image_path TEXT,
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
-  )`, (err) => {
+  db.run(`CREATE TABLE IF NOT EXISTS refuel_records(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicle_id INTEGER NOT NULL,
+            liters REAL,
+            price REAL,
+            mileage REAL NOT NULL,
+            refuel_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            image_path TEXT,
+            FOREIGN KEY(vehicle_id) REFERENCES vehicles(id)
+          )`, (err) => {
     if (err) {
       console.error('创建加油记录表错误:', err.message);
     } else {
@@ -49,15 +53,15 @@ function initDatabase() {
   });
 
   // 额外消费表
-  db.run(`CREATE TABLE IF NOT EXISTS extra_expenses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    vehicle_id INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    amount REAL NOT NULL,
-    expense_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    image_path TEXT,
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
-  )`, (err) => {
+  db.run(`CREATE TABLE IF NOT EXISTS extra_expenses(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicle_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            amount REAL NOT NULL,
+            expense_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            image_path TEXT,
+            FOREIGN KEY(vehicle_id) REFERENCES vehicles(id)
+          )`, (err) => {
     if (err) {
       console.error('创建额外消费表错误:', err.message);
     } else {
@@ -69,30 +73,30 @@ function initDatabase() {
   });
 
   // 维保设置表
-  db.run(`CREATE TABLE IF NOT EXISTS maintenance_settings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    vehicle_id INTEGER NOT NULL,
-    interval_km REAL NOT NULL,
-    description TEXT,
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
-    UNIQUE(vehicle_id, interval_km)
-  )`, (err) => {
+  db.run(`CREATE TABLE IF NOT EXISTS maintenance_settings(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicle_id INTEGER NOT NULL,
+            interval_km REAL NOT NULL,
+            description TEXT,
+            FOREIGN KEY(vehicle_id) REFERENCES vehicles(id),
+            UNIQUE(vehicle_id, interval_km)
+          )`, (err) => {
     if (err) {
       console.error('创建维保设置表错误:', err.message);
     }
   });
 
   // 维保记录表
-  db.run(`CREATE TABLE IF NOT EXISTS maintenance_records (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    vehicle_id INTEGER NOT NULL,
-    maintenance_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    mileage REAL NOT NULL,
-    description TEXT,
-    amount REAL NOT NULL,
-    image_path TEXT,
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
-  )`, (err) => {
+  db.run(`CREATE TABLE IF NOT EXISTS maintenance_records(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            vehicle_id INTEGER NOT NULL,
+            maintenance_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+            mileage REAL NOT NULL,
+            description TEXT,
+            amount REAL NOT NULL,
+            image_path TEXT,
+            FOREIGN KEY(vehicle_id) REFERENCES vehicles(id)
+          )`, (err) => {
     if (err) {
       console.error('创建维保记录表错误:', err.message);
     } else {
@@ -114,7 +118,7 @@ function addVehicle(name, currentMileage, callback) {
   db.run(
     'INSERT INTO vehicles (name, current_mileage) VALUES (?, ?)',
     [name, currentMileage],
-    function(err) {
+    function (err) {
       if (err) {
         callback(err);
       } else {
@@ -123,7 +127,7 @@ function addVehicle(name, currentMileage, callback) {
         db.run(
           'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date) VALUES (?, ?, ?, ?, ?)',
           [vehicleId, null, null, currentMileage, new Date().toISOString()],
-          function(recordErr) {
+          function (recordErr) {
             if (recordErr) {
               console.error('创建初始记录错误:', recordErr.message);
             }
@@ -140,6 +144,15 @@ function updateVehicleMileage(vehicleId, mileage, callback) {
   db.run(
     'UPDATE vehicles SET current_mileage = ? WHERE id = ?',
     [mileage, vehicleId],
+    callback
+  );
+}
+
+// 设置/更新车辆密码
+function updateVehiclePassword(vehicleId, password, callback) {
+  db.run(
+    'UPDATE vehicles SET password = ? WHERE id = ?',
+    [password, vehicleId],
     callback
   );
 }
@@ -165,7 +178,7 @@ function addRefuelRecord(vehicleId, liters, price, mileage, refuelDate, imagePat
   db.run(
     'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date, image_path) VALUES (?, ?, ?, ?, ?, ?)',
     [vehicleId, litersValue, priceValue, mileage, date, imagePath || null],
-    function(err) {
+    function (err) {
       if (err) {
         callback(err);
       } else {
@@ -183,7 +196,7 @@ function updateRefuelRecord(recordId, liters, price, mileage, refuelDate, imageP
   db.run(
     'UPDATE refuel_records SET liters = ?, price = ?, mileage = ?, refuel_date = ?, image_path = ? WHERE id = ?',
     [liters, price, mileage, refuelDate, imagePath || null, recordId],
-    function(err) {
+    function (err) {
       if (err) {
         callback(err);
       } else {
@@ -269,16 +282,16 @@ function getAllRefuelRecords(callback) {
 // 获取车辆统计信息
 function getVehicleStats(vehicleId, callback) {
   db.all(
-    `SELECT 
-      COUNT(*) as total_refuels,
-      SUM(liters) as total_liters,
-      SUM(price) as total_cost,
-      AVG(price / liters) as avg_price_per_liter,
-      MIN(mileage) as min_mileage,
-      MAX(mileage) as max_mileage,
-      MAX(mileage) - MIN(mileage) as total_distance
+    `SELECT
+  COUNT(*) as total_refuels,
+    SUM(liters) as total_liters,
+    SUM(price) as total_cost,
+    AVG(price / liters) as avg_price_per_liter,
+    MIN(mileage) as min_mileage,
+    MAX(mileage) as max_mileage,
+    MAX(mileage) - MIN(mileage) as total_distance
      FROM refuel_records 
-     WHERE vehicle_id = ?`,
+     WHERE vehicle_id = ? `,
     [vehicleId],
     (err, rows) => {
       if (err) {
@@ -290,8 +303,8 @@ function getVehicleStats(vehicleId, callback) {
           db.all(
             `SELECT mileage, liters 
              FROM refuel_records 
-             WHERE vehicle_id = ? 
-             ORDER BY mileage ASC`,
+             WHERE vehicle_id = ?
+    ORDER BY mileage ASC`,
             [vehicleId],
             (err2, records) => {
               if (err2) {
@@ -300,7 +313,7 @@ function getVehicleStats(vehicleId, callback) {
                 let totalDistance = 0;
                 let totalLiters = 0;
                 for (let i = 1; i < records.length; i++) {
-                  const distance = records[i].mileage - records[i-1].mileage;
+                  const distance = records[i].mileage - records[i - 1].mileage;
                   totalDistance += distance;
                   totalLiters += records[i].liters;
                 }
@@ -333,7 +346,7 @@ function addExtraExpense(vehicleId, title, amount, expenseDate, imagePath, callb
   db.run(
     'INSERT INTO extra_expenses (vehicle_id, title, amount, expense_date, image_path) VALUES (?, ?, ?, ?, ?)',
     [vehicleId, title, amount, date, imagePath || null],
-    function(err) {
+    function (err) {
       callback(err, this.lastID);
     }
   );
@@ -356,11 +369,11 @@ function deleteExtraExpense(expenseId, callback) {
 // 获取车辆额外消费统计
 function getExtraExpenseStats(vehicleId, callback) {
   db.all(
-    `SELECT 
-      COUNT(*) as total_expenses,
-      SUM(amount) as total_amount
+    `SELECT
+  COUNT(*) as total_expenses,
+    SUM(amount) as total_amount
      FROM extra_expenses 
-     WHERE vehicle_id = ?`,
+     WHERE vehicle_id = ? `,
     [vehicleId],
     (err, rows) => {
       if (err) {
@@ -380,9 +393,9 @@ function clearRefuelRecords(vehicleId, callback) {
       callback(err);
       return;
     }
-    
+
     const initialMileage = vehicle ? vehicle.current_mileage : 0;
-    
+
     // 删除所有记录
     db.run('DELETE FROM refuel_records WHERE vehicle_id = ?', [vehicleId], (err2) => {
       if (err2) {
@@ -392,7 +405,7 @@ function clearRefuelRecords(vehicleId, callback) {
         db.run(
           'INSERT INTO refuel_records (vehicle_id, liters, price, mileage, refuel_date) VALUES (?, ?, ?, ?, ?)',
           [vehicleId, null, null, initialMileage, new Date().toISOString()],
-          function(err3) {
+          function (err3) {
             if (err3) {
               console.error('创建初始记录错误:', err3.message);
             }
@@ -424,7 +437,7 @@ function addMaintenanceSetting(vehicleId, intervalKm, description, callback) {
   db.run(
     'INSERT OR REPLACE INTO maintenance_settings (vehicle_id, interval_km, description) VALUES (?, ?, ?)',
     [vehicleId, intervalKm, description || null],
-    function(err) {
+    function (err) {
       callback(err, this.lastID);
     }
   );
@@ -461,7 +474,7 @@ function addMaintenanceRecord(vehicleId, mileage, description, amount, maintenan
   db.run(
     'INSERT INTO maintenance_records (vehicle_id, mileage, description, amount, maintenance_date, image_path) VALUES (?, ?, ?, ?, ?, ?)',
     [vehicleId, mileage, description || null, amount, date, imagePath || null],
-    function(err) {
+    function (err) {
       callback(err, this.lastID);
     }
   );
@@ -486,6 +499,7 @@ module.exports = {
   getAllVehicles,
   addVehicle,
   updateVehicleMileage,
+  updateVehiclePassword,
   deleteVehicle,
   addRefuelRecord,
   updateRefuelRecord,

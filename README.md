@@ -27,6 +27,47 @@ npm start
 
 服务器将在 `http://localhost:3000` 启动
 
+## Docker 部署
+
+如果你偏好使用 Docker，可以通过以下方式快速运行：
+
+### 1. 直接运行（使用 Docker Hub 镜像）
+
+可选，使用tar包加载docker
+```
+load -i oil-assist-20260108-215255.tar
+```
+
+```bash
+docker run -d -p 3088:3000 \
+  -v oil-assist-data:/app \
+  --name oil-assist \
+  kasusa/oil-assist:latest
+```
+
+### 2. 本地构建并运行
+
+```bash
+# 构建镜像
+docker build -t oil-assist .
+
+# 运行容器 (数据持久化)
+docker run -d -p 3088:3000 \
+  -v $(pwd)/data:/app \
+  --name oil-assist \
+  oil-assist
+```
+
+### 3. 使用自动化脚本 (Windows)
+
+项目中包含一个 PowerShell 脚本，可以自动化构建、推送和打包流程：
+
+```powershell
+.\docker-build-push.ps1
+```
+
+> **注意**：为了保证数据不丢失，建议始终使用 `-v` 参数挂载数据卷或本地目录来存储数据库文件 `oil_assist.db`。
+
 ## 使用方法
 
 ### 添加车辆
