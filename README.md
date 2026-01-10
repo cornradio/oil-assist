@@ -2,7 +2,7 @@
 
 油耗助手，可以记录油耗、其他花费以及按照公里数提醒维保。
 
-<img width="1503" height="4319" alt="oil-assist" src="https://github.com/user-attachments/assets/190212b9-d1dc-484a-92ec-8c0d3a1fd6a8" />
+<img width="500" height="" alt="oil-assist" src="https://github.com/user-attachments/assets/190212b9-d1dc-484a-92ec-8c0d3a1fd6a8" />
 
 
 ## 功能特点
