@@ -2,6 +2,8 @@
 
 油耗助手，可以记录油耗、其他花费以及按照公里数提醒维保。
 
+部署方式分成 [node 源码部署](#node-部署)、[Docker 部署](#docker-部署)。
+
 <img width="500" height="" alt="oil-assist" src="https://github.com/user-attachments/assets/190212b9-d1dc-484a-92ec-8c0d3a1fd6a8" />
 
 
@@ -14,7 +16,6 @@
 - ✅ **图表展示**：可视化展示油耗趋势、费用和油价变化
 - ✅ **响应式设计**：完美支持手机和电脑访问
 
-部署方式分成 node 源码部署、docker 部署。
 
 ## node 部署
 
